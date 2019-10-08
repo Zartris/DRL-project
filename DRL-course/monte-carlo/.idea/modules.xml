@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/balance_pole.iml" filepath="$PROJECT_DIR$/.idea/balance_pole.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/monte-carlo.iml" filepath="$PROJECT_DIR$/.idea/monte-carlo.iml" />
     </modules>
   </component>
 </project>
