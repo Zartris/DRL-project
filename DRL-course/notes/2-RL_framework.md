@@ -61,8 +61,8 @@ So for each possible action in given state $s$: we have $\frac{\epsilon}{|A(s)|}
 
 Notes:
 
-* Equiprobable random policy is setting $\epsilon = 1$, all action are favoured equally.
-  * Setting $\epsilon = 0$, favoures only the greedy descision.
+* Equiprobable random policy is setting $\epsilon = 1$, all action are favored equally.
+  * Setting $\epsilon = 0$, favors only the greedy decision.
 
 ### Greedy in the Limit with Infinite Exploration (GLIE)
 
@@ -82,3 +82,68 @@ One way to satisfy these conditions  is to modify the value of $\epsilon$ when s
 - $\epsilon_i$ decays to zero in the limit as the time step $i$ approaches infinity (that is, $\lim_{i\to\infty} \epsilon_i = 0$).
 
 For example, to ensure convergence to the optimal policy, we could set $\epsilon_i = \frac{1}{i}$.
+
+***READ LATER*** = https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf
+
+#### Setting the Value of $\epsilon$, in Practice
+
+
+
+
+
+### Incremental Mean - Update the policy each episode.
+
+<img src="\images\incremental_mean.png" style="zoom: 33%;" />
+
+There are two relevant tables:
+
+- $Q$ -table, with a row for each state and a column for each action. The entry corresponding to state $s$ and action $a$ is denoted $Q(s,a)$.
+- $N$ - table that keeps track of the number of first visits we have made to each state-action pair.
+
+The number of episodes the agent collects is equal to $num\_episodes$.
+
+The algorithm proceeds by looping over the following steps:
+
+- **Step 1**: The policy $\pi$ is improved to be $\epsilon$-greedy with respect to $Q$, and the agent uses $\pi$ to collect an episode.
+- **Step 2**: $N$ is updated to count the total number of first visits to each state action pair.
+- **Step 3**: The estimates in $Q$ are updated to take into account the most recent information.
+
+In this way, the agent is able to improve the policy after every episode!
+
+### Constant-alpha
+
+<img src="\images\constant_alpha.png" style="zoom: 25%;" />
+
+We can denote the error between what we predicted $Q(s,a)$ and the actual result given as delta:
+$$
+\delta_t := G_t - Q(S_t, A_t)
+$$
+
+
+* If $\delta_t > 0$, then increase $Q(S_t, A_t)$ since our estimate is to low.
+* if $\delta_t <0 $, then decrease $Q(S_t, A_t)$ since the estimate is to high.
+
+​	But how much should we increase or decrease this?
+
+Well we have seen $\alpha = \dfrac{1}{N(S_t, A_t)}$ which is the average over everything we have seen.
+
+But the more we train the less we can change this average. So using a constant **step size**: $\alpha$ we emphasizes the changes that comes later more than we do of what we have seen long ago.
+
+#### Setting the value of $\alpha$
+
+Recall the update equation that we use to amend the values in the Q-table:
+$$
+Q(S_t, A_t) \leftarrow   Q(S_t, A_t) + \alpha (G_t - Q(S_t, A_t))
+$$
+To examine how to set the the value of $\alpha$ in more detail, we will slightly rewrite the equation as follows:
+$$
+Q(S_t,A_t) \leftarrow (1-\alpha)Q(S_t,A_t) + \alpha G_t
+$$
+We have to set $\alpha$ between ZERO and ONE:  $0< \alpha \leq 1$
+
+* Setting $\alpha$ to **ZERO** makes the function keeps the value of the Q-table and forget anything new. We never want this to happen since we will never learn anything new.
+  * $Q(S_t,A_t) \leftarrow Q(S_t,A_t)$
+* Setting $\alpha$ to **ONE** makes the function forget everything we learn in the past and update the value in the Q-table with the newest result.
+  * $Q(S_t,A_t) \leftarrow G_t$
+
+Smaller values for $\alpha$ encourage the agent to consider a longer history of returns when calculating the action-value function estimate. Increasing the value of $\alpha$ ensures that the agent focuses more on the most recently sampled returns.
