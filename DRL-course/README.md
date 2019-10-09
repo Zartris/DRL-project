@@ -17,3 +17,13 @@ git clone https://github.com/udacity/deep-reinforcement-learning.git
 
 
 For Books login to https://www.manning.com/dashboard
+
+
+
+
+
+## Questions for next session:
+
+**Monte carlo**
+
+1. Having a hard time Validating the result, is there a way to know that the Q-table wont improve from this point on, like we kinda have in "Supervised learning" converging.
