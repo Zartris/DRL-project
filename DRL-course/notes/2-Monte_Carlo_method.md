@@ -1,22 +1,25 @@
-## Monte Carlo method
+# Monte Carlo method
 
 We can use the monte Carlo method to estimate the action value function.
 The Monte Carlo methods is using randomness to solve the **prediction problem**.
+
+The **equiprobable random policy** is the stochastic policy where - from each state - the agent randomly selects from the set of available actions, and each action is selected with equal probability. 
 
 **Prediction Problem**: Given a policy, how might the agent estimate the value function for that policy?
 
 #### MC Prediction
 
 * An algorithm that solves the prediction problem and determine the value function $v_{\pi} (\text{or } q_{\pi})$ corresponding to a policy $\pi$.
-* 
+* When working with finite MDPs, we can estimate the action-value function $q_{\pi}$ corresponding to a policy $\pi$ in a table known as a **Q-table**.  This table has one row for each state and one column for each action.  The entry in the $s$-th row and $a$-th column contains the agent's estimate for expected return that is likely to follow, if the agent starts in state $s$, selects action $a$, and then henceforth follows the policy $\pi$.
+* Each occurrence of the state-action pair $s,a (s\in\mathcal{S},a\in\mathcal{A})$in an episode is called a **visit to $s,a$**.
 
-This is done by using a Q-table:
+This is done by using a Q-table, where each entry is the expected reward ($G_t$) for the given pair of state,action:
 
 | States/actions | action 1. | action 2. | action 3. |
 | -------------- | --------- | --------- | --------- |
-| State 1.       |           |           |           |
-| State 2.       |           |           |           |
-| State 3.       |           |           |           |
+| State 1.       | +6        | -2        | -3        |
+| State 2.       | +1        | +2        | ...       |
+| State 3.       | ...       | ...       | ...       |
 
 2-types of MC Prediction:
 
@@ -64,6 +67,14 @@ Notes:
 * Equiprobable random policy is setting $\epsilon = 1$, all action are favored equally.
   * Setting $\epsilon = 0$, favors only the greedy decision.
 
+
+
+### Exploration vs. Exploitation
+
+- All reinforcement learning agents face the **Exploration-Exploitation Dilemma**, where they must find a way to balance the drive to behave optimally based on their current knowledge (**exploitation**) and the need to acquire knowledge to attain better judgment (**exploration**).
+
+
+
 ### Greedy in the Limit with Infinite Exploration (GLIE)
 
 In order to guarantee that MC control converges to the optimal policy $\pi_*$, we need to ensure that two conditions are met.  We refer to these conditions as **Greedy in the Limit with Infinite Exploration (GLIE)**.  In particular, if:
@@ -87,9 +98,16 @@ For example, to ensure convergence to the optimal policy, we could set $\epsilon
 
 #### Setting the Value of $\epsilon$, in Practice
 
+In practice we never really want the agent to stop exploring, since we have no idea when it will converge.
 
+So letting the $\epsilon$ decay to fast, will result in a very long training time, since we don't really explore other solutions enough. 
 
+> Even though convergence is **not** guaranteed by the mathematics, you can often get better results by either:
+>
+> - using fixed $\epsilon$, or
+> - letting $\epsilon_i$ decay to a small positive number, like 0.1.  
 
+This is because one has to be very careful with setting the decay rate for ϵ\epsilonϵ; letting it get too small too fast can be disastrous.  If you get late in training and ϵ\epsilonϵ is really small, you pretty much want the agent to have already converged to the optimal policy, as it will take way too long otherwise for it to test out new actions!
 
 ### Incremental Mean - Update the policy each episode.
 

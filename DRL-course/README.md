@@ -27,3 +27,9 @@ For Books login to https://www.manning.com/dashboard
 **Monte carlo**
 
 1. Having a hard time Validating the result, is there a way to know that the Q-table wont improve from this point on, like we kinda have in "Supervised learning" converging.
+
+
+
+**TD - method**
+
+1. Q-learning is that both the sarsamax and the sarsa expected?
