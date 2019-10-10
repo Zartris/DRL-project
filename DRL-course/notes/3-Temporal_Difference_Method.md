@@ -55,3 +55,6 @@ Q(s_t, a_t) = Q(s_t, a_t) +\alpha (G_t - Q(s_t, a_t))
 $$
 <img src="images\expected_sarsa.png" style="zoom:25%;" />
 
+### Optimism
+
+You have learned that for any TD control method, you must begin by initializing the values in the Q-table. It has been shown that [initializing the estimates to large values](http://papers.nips.cc/paper/1944-convergence-of-optimistic-and-incremental-q-learning.pdf) can improve performance. For instance, if all of the possible rewards that can be received by the agent are negative, then initializing every estimate in the Q-table to zeros is a good technique. In this case, we refer to the initialized Q-table as **optimistic**, since the action-value estimates are guaranteed to be larger than the true action values.
