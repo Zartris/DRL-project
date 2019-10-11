@@ -58,3 +58,21 @@ $$
 ### Optimism
 
 You have learned that for any TD control method, you must begin by initializing the values in the Q-table. It has been shown that [initializing the estimates to large values](http://papers.nips.cc/paper/1944-convergence-of-optimistic-and-incremental-q-learning.pdf) can improve performance. For instance, if all of the possible rewards that can be received by the agent are negative, then initializing every estimate in the Q-table to zeros is a good technique. In this case, we refer to the initialized Q-table as **optimistic**, since the action-value estimates are guaranteed to be larger than the true action values.
+
+### Similarities
+
+All of the TD control methods we have examined (Sarsa, Sarsamax, Expected Sarsa) converge to the optimal action-value function $q_*$ (and so yield the optimal policy $\pi_*$) if:
+
+1. the value of $\epsilon$ decays in accordance with the GLIE conditions, and
+2. the step-size parameter $\alpha$ is sufficiently small.
+
+### Differences
+
+The differences between these algorithms are summarized below:
+
+- Sarsa and Expected Sarsa are both **on-policy** TD control algorithms.  In this case, the same ($\epsilon$-greedy) policy that is evaluated and improved is also used to select actions.
+- Sarsamax is an **off-policy** method, where the (greedy) policy that is evaluated and improved is different from the ($\epsilon$-greedy) policy that is used to select actions.
+- On-policy TD control methods (like Expected Sarsa and Sarsa) have  better online performance than off-policy TD control methods (like  Sarsamax). 
+- Expected Sarsa generally achieves better performance than Sarsa.
+
+If you would like to learn more, you are encouraged to read Chapter 6 of the [textbook](http://go.udacity.com/rl-textbook) (especially sections 6.4-6.6).
