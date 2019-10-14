@@ -20,7 +20,12 @@ class PickupAgent(BaseAgent):
         self.mover_agent = mover_agent
 
     def perform_task(self, env, state):
-        state = env.reset()
+        """
+
+        :param env:
+        :param state:
+        :return: state, samp_reward, done, env
+        """
         samp_reward = 0
         while True:
             # agent selects an action
@@ -37,10 +42,12 @@ class PickupAgent(BaseAgent):
             if done:
                 # save final sampled reward
                 break
-        return samp_reward, env
+        return state, samp_reward, done, env
 
     def perform_action(self, action, env, state):
         if action == 0:  # PICKUP
             return env.step(4)
-        else:  # Deliver
-            return self.mover_agent.move_to(state, env)
+        else:  # Move
+            taxi_row, taxi_col, pass_idx, dest_idx = self.decode_state(state)
+            position = self.color_to_pos(pass_idx)
+            return self.mover_agent.move_to(position, state, env)

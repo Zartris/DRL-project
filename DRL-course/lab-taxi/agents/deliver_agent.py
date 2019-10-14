@@ -36,10 +36,20 @@ class DeliverAgent(BaseAgent):
             if done:
                 # save final sampled reward
                 break
-        return samp_reward, env
+        return samp_reward, env, done
 
     def perform_action(self, action, env, state):
-        if action == 0:  # PICKUP
-            return self.pickup.perform_task(env, state)
-        else:  # Deliver
-            return self.deliver.perform_task(env, state)
+        """
+        Perform action.
+        :param action:
+        :param env:
+        :param state:
+        :return: next_state, reward, env
+        """
+        if action == 0:  # Deliver
+            next_state, reward, done, _ = env.step(4)
+            return next_state, reward, env
+        else:  # Move
+            taxi_row, taxi_col, pass_idx, dest_idx = self.decode_state(state)
+            position = self.color_to_pos(pass_idx)
+            return self.mover_agent.move_to(position, state, env)
