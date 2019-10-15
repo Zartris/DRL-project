@@ -3,7 +3,7 @@ import sys
 import math
 import numpy as np
 
-def interact(env, agent, num_episodes=1, window=100):
+def interact(env, agent, num_episodes=2000000, window=100):
     """ Monitor agent's performance.
     
     Params
@@ -37,7 +37,6 @@ def interact(env, agent, num_episodes=1, window=100):
             next_state, reward, done, _ = env.step(action)
             # agent performs internal updates based on sampled experience
             agent.step(state, action, reward, next_state, done)
-            env.render()
             # update the sampled reward
             samp_reward += reward
             # update the state (s <- s') to next time step

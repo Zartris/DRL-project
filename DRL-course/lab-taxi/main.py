@@ -7,7 +7,6 @@ import numpy as np
 env = gym.make('Taxi-v2')
 env.render()
 agent = Agent()
-agent = RootAgent()
 
 
 

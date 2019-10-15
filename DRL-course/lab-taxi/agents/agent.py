@@ -108,7 +108,6 @@ class Agent:
         - done: whether the episode is complete (True or False)
         """
         taxi_row, taxi_col, pass_idx, dest_idx = self.decode_state(state)
-        print("(", (taxi_row), ",", str(taxi_col), ")")
         self.update_Q_table(state, action, reward, next_state, done)
         # Update epsilon:
         if done:

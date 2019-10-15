@@ -4,7 +4,7 @@ import math
 import numpy as np
 
 
-def interact(env, agent, num_episodes=1, window=100):
+def interact(env, agent, num_episodes=200000, window=1000):
     """ Monitor agent's performance.
     
     Params
@@ -30,7 +30,8 @@ def interact(env, agent, num_episodes=1, window=100):
         # begin the episode
 
         # initialize the sampled reward
-        reward, env = agent.play_episode(env)
+        reward, env_new = agent.play_episode(env)
+        env = env_new
         samp_rewards.append(reward)
         if (i_episode >= 100):
             # get average reward from last 100 episodes

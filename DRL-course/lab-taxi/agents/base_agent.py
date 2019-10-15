@@ -5,7 +5,7 @@ from collections import defaultdict
 
 
 class BaseAgent:
-    def __init__(self, nA, alpha=1, gamma=1, epsilon_init=0.5, epsilon_decay=0.99995, epsilon_limit=0.0001,
+    def __init__(self, name, nA, alpha=1, gamma=1, epsilon_init=0.5, epsilon_decay=0.99995, epsilon_limit=0.0001,
                  sarsa="MAX"):
         """ Initialize agent.
 
@@ -13,11 +13,12 @@ class BaseAgent:
         ======
         - nA: number of actions available to the agent
         """
+        self.name = name
         self.nA = nA
         self.Q = defaultdict(lambda: np.zeros(self.nA))
         self.alpha = alpha
         self.alpha_decay = 0.9999
-        self.alpha_limit = 0.0001
+        self.alpha_limit = 0.01
         self.gamma = gamma
         self.eps = epsilon_init
         self.eps_decay = epsilon_decay
@@ -49,6 +50,8 @@ class BaseAgent:
         out.append(state % 5)
         state = state // 5
         out.append(state)
+        if not 0 <= state < 5:
+            debug = 0
         assert 0 <= state < 5
         return reversed(out)
 
@@ -56,12 +59,14 @@ class BaseAgent:
     def color_to_pos(color):
         if color == 0:  # RED
             pos = (0, 0)
-        if color == 1:  # GREEN
+        elif color == 1:  # GREEN
             pos = (0, 4)
-        if color == 2:  # YELLOW
+        elif color == 2:  # YELLOW
             pos = (4, 0)
-        if color == 3:
+        elif color == 3:
             pos = (4, 3)
+        elif color == 4:
+            pos = (-1, -1)
         else:
             pos = None
         return pos
@@ -122,7 +127,6 @@ class BaseAgent:
         - done: whether the episode is complete (True or False)
         """
         taxi_row, taxi_col, pass_idx, dest_idx = self.decode_state(state)
-        print("(", (taxi_row), ",", str(taxi_col), ")")
         self.update_Q_table(state, action, reward, next_state, done)
         # Update epsilon:
         if done:
@@ -133,10 +137,10 @@ class BaseAgent:
             # print("\n", self.eps)
             if not self.hit_e and self.eps == self.eps_limit:
                 self.hit_e = True
-                print("\nepsilon limit is hit")
+                print("\n", self.name, "epsilon limit is hit")
             if not self.hit_a and self.alpha == self.alpha_limit:
                 self.hit_a = True
-                print("\nalpha limit is hit")
+                print("\n", self.name, "alpha limit is hit")
 
     def update_Q_table(self, state, action, reward, next_state, done):
         current = self.Q[state][action]
