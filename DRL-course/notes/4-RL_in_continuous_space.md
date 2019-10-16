@@ -106,7 +106,7 @@ def TILE_CODING (S, A, P, R, gamma, m, n)
 
 
 
-Tile-coding has some drawbacks, one is we still have to manually select the tile sizes, there offsets and number of tilings.
+Tile-coding has some drawbacks, one is we still have to manually select the tile sizes, there offsets and number of tiling's.
 
 A more adaptive approach is Adaptive Tile-coding.
 
