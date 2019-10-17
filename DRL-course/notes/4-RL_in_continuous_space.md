@@ -132,5 +132,32 @@ The resulting space is appropriately partitioned based on its complexity.
 
 ____
 
+#### 4. Function approximation
 
+Given a problem domain with continuous states $s \in \mathcal{S} = {\mathbb{R}^{n}}$, we wish to find a way to represent the value function $v_{\pi}(s)$ (for prediction) or $q_{\pi}(s, a)$ (for control).
 
+We can do this by choosing a parameterized function that *approximates* the true value function:
+
+$\hat{v}(s, \mathbf{w}) \approx v_{\pi}(s)$
+ $\hat{q}(s, a, \mathbf{w}) \approx q_{\pi}(s, a)$
+
+Our goal then reduces to finding a set of parameters $\mathbf{w}$  that yield an optimal value function. We can use the general  reinforcement learning framework, with a Monte-Carlo or  Temporal-Difference approach, and modify the update mechanism according  to the chosen function.
+
+**Feature vector**
+
+A common intermediate step is to compute a feature vector that is representative of the state: $\mathbf{x}(s)= \begin{bmatrix} x_1(s)\\x_2(s) \\ \vdots \\ x_n(s) \end{bmatrix} $
+
+**Dot product**
+
+What do we do when we have two vectors and want to produce a scalar $\mathbf{w}$?
+
+- Dot product!
+
+$$
+\hat{v}(s, \mathbf{w}) = \mathbf{x}(s)^\intercal \cdot \mathbf{w}\\
+= \Big(x_1(s)\cdots x_n(s) \Big) \cdot \begin{bmatrix} w_1 \\ \vdots \\ w_n \end{bmatrix} \\
+= x_1(s) \cdot w_1 + \cdots + x_n(s) \cdot w_n\\
+= \sum_{j=1}^n x_j(s)*w_j
+$$
+
+This is known as linear function approximation.

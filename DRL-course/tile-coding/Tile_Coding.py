@@ -3,10 +3,12 @@ import sys
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
-from Q_table_tiling import TiledQTable
+import Q_table_tiling
+from Q_learning_tile_agent import QLearningAgent
 
 
 def create_tiling_grid(low, high, bins=(10, 10), offsets=(0.0, 0.0)):
@@ -171,12 +173,21 @@ def tile_encode(sample, tilings, flatten=False):
     encoded_sample = [discretize(sample, grid) for grid in tilings]
     return np.concatenate(encoded_sample) if flatten else encoded_sample
 
+def plot_scores(scores, rolling_window=100):
+    """Plot scores and optional rolling mean using specified window."""
+    plt.plot(scores)
+    plt.title("Scores")
+    rolling_mean = pd.Series(scores).rolling(rolling_window).mean()
+    plt.plot(rolling_mean)
+    return rolling_mean
+
 
 if __name__ == '__main__':
     # Set plotting options
     ex1 = False
-    ex2 = True
-    ex3 = True
+    ex2 = False
+    ex3 = False
+    ex4 = True
 
     plt.style.use('ggplot')
     np.set_printoptions(precision=3, linewidth=120)
@@ -231,7 +242,7 @@ if __name__ == '__main__':
         tiling_specs = [((10, 10), (-0.066, -0.33)),
                         ((10, 10), (0.0, 0.0)),
                         ((10, 10), (0.066, 0.33))]
-        tq = TiledQTable(low, high, tiling_specs, 2)
+        tq = Q_table_tiling.TiledQTable(low, high, tiling_specs, 2)
         # Test with a sample Q-table
         s1 = 3
         s2 = 4
@@ -240,7 +251,35 @@ if __name__ == '__main__':
         print(
             "[GET]    Q({}, {}) = {}".format(samples[s1], a,
                                              tq.get(samples[s1], a)))  # check value at sample = s1, action = a
-        print("[UPDATE] Q({}, {}) = {}".format(samples[s2], a, q));
+        print("[UPDATE] Q({}, {}) = {}".format(samples[s2], a, q))
         tq.update(samples[s2], a, q)  # update value for sample with some common tile(s)
         print("[GET]    Q({}, {}) = {}".format(samples[s1], a,
                                                tq.get(samples[s1], a)))  # check value again, should be slightly updated
+    elif ex4:
+        debug = 0
+        nA = env.action_space.n
+        n_bins = 5
+        bins = tuple([n_bins] * env.observation_space.shape[0])
+        offset_pos = (env.observation_space.high - env.observation_space.low) / (3 * n_bins)
+
+        tiling_specs = [(bins, -offset_pos),
+                        (bins, tuple([0.0] * env.observation_space.shape[0])),
+                        (bins, offset_pos)]
+        agent = QLearningAgent(env, nA, tiling_specs, 1, 0.02, 0.99)
+        print("TRAIN")
+        scores = agent.train(env)
+        rolling_mean = plot_scores(scores)
+        plt.show()
+        scores = agent.train(env,1, mode="test")
+        # Visualize the learned Q-table
+        state = env.reset()
+        score = 0
+        for t in range(200):
+            action = agent.act(state, mode='test')
+            env.render()
+            state, reward, done, _ = env.step(action)
+            score += reward
+            if done:
+                break
+        print('Final score:', score)
+        env.close()
