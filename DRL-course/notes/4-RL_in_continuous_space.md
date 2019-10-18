@@ -25,7 +25,7 @@ Many algorithms for computing the Value Functions, needs a discrete space, since
 
 So if we before could think of a Q-table as spaces x actions we now have to think of it as a density plot over a desired range.
 
-<img src="D:\dev\learning\DRL-project\DRL-course\notes\images\Continuous_space.jpg" style="zoom: 50%;" />
+<img src="images\Continuous_space.jpg" style="zoom: 50%;" />
 
 Actions can be Continuous as well, in fact most real-world applications are.
 For example the smallest change in velocity $\in R^n$ can change the output.
@@ -61,7 +61,7 @@ Ways to alter the grid structure (none-Uniform Discretization):
 * Alter the size of the grid to fit with obstacles
 *  An alternate approach would be to divide up the grid into smaller cells where required.
 
-<img src="D:\dev\learning\DRL-project\DRL-course\notes\images\discretization.jpg" alt="1: Uniform discretization, 2: Non-Uniform, 3: Non-Uniform smaller cells" style="zoom:150%;" />
+<img src="images\discretization.jpg" alt="1: Uniform discretization, 2: Non-Uniform, 3: Non-Uniform smaller cells" style="zoom:150%;" />
 
 *Exercise "Discretization"*
 
@@ -75,7 +75,7 @@ As we seen in the previous Discretization method, some kind of prior knowledge i
 
 A more generic method is Tile-coding.
 
-![](D:\dev\learning\DRL-project\DRL-course\notes\images\tile_coding.png)
+![](images\tile_coding.png)
 
 The underlying space is continuous and 2 dimensional. Then we overlay multiple grids or tilings on top of this space, each slightly offset from each other. 
 
@@ -161,3 +161,98 @@ $$
 $$
 
 This is known as linear function approximation.
+
+____
+
+#### 4.1 Linear function approximation
+
+**Value approximation:**
+
+Taking the derivate of $\triangledown_w\hat{v}(s, \mathbf{w}) = \mathbf{x}(s)$ so by this follows:
+
+* Value function : $\hat{v}(s,w) = \mathbf{x}(s)^\intercal \mathbf{w}$
+* minimize Error : $\mathbb{J}(\mathbf{w}) = \mathbb{E}\Big[ \big(v_\pi(s) - \mathbf{x}(s)^\intercal \mathbf{w}\big)^2\Big] $
+* Error Gradient : $\triangledown_w \mathbb{J}(\mathbf{w}) = -2\big(v_\pi(s) - \mathbf{x}(s)^\intercal \mathbf{w} \big) \mathbf{x}(s) $
+* Update rule : $\Delta \mathbf{w} = - \alpha \frac{1}{2}\triangledown_w \mathbb{J}(\mathbf{w}) = \alpha \Big(v_\pi(s) - \mathbf{x}(s)^\intercal \mathbf{w} \Big) \mathbf{x}(s)$
+
+<img src="images\linear_function_approximation.jpg" style="zoom: 67%;" />
+
+
+
+**Action value approximation:**
+
+Now we want to approximate the action value function $\hat{q}(s,a,\mathbf{w})$.
+
+First we create the feature vector as before in the following way:
+
+$\mathbf{x}(s,a)= \begin{bmatrix} x_1(s,a)\\x_2(s,a) \\ \vdots \\ x_n(s,a) \end{bmatrix} $
+
+For each state we would need to compute the action value function
+$$
+\hat{q}(s, a_1, \mathbf{w}) = ?\\
+\cdots \\
+\hat{q}(s, a_m, \mathbf{w}) = ?
+$$
+we are trying to find $n$ different action-value functions, one for each action dimension, but intuitively we know that these function are related. So it makes sense we can compute them together. 
+
+We can do this by extending our weight vector and turning it into a matrix:
+$$
+\hat{q}(s,a, \mathbf{w}) = \big(x_1(s,a)\cdots x_n(s,a) \big) \cdot \begin{bmatrix} w_{11}\cdots w_{1m} \\ \vdots \quad\ddots\quad \vdots  \\  w_{n1}\cdots w_{nm} \end{bmatrix} \\
+= \Big( \hat{q}(s,a_1,\mathbf{w}) \cdots \hat{q}(s,a_m,\mathbf{w})\Big)
+$$
+Here each column of the matrix emulates a separate linear function.
+
+**Limitations:**
+
+The primary limitation of linear function approximation is that we can only represent linear relationships between inputs and outputs.
+
+With one dimensional input this is a line and in two dimensions it becomes a plane and so on.
+
+So if our underlying function has a non-linear shape, our linear approximation may give very bad results.
+
+____
+
+#### 4.2 Kernel functions
+
+We can use kernels to emulate a non-linear function in linear space.
+
+We defined our feature vector as something generic. Something that takes a state or a state action pair and produces a feature vector.
+
+$\mathbf{x}(s,a)= \begin{bmatrix} x_1(s,a)\\x_2(s,a) \\ \vdots \\ x_n(s,a) \end{bmatrix} $
+
+Each element $(\cdots x_i(s,a) \cdots)$of this vector can be produced by a separate function, which can be non-linear, for example, lets say that s is defined as a single real number, then we could have that:
+$$
+x_1(s) = s\\
+x_2(s) = s^2\\
+x_3(s) = s^3\\
+\vdots
+$$
+These are called Kernel Functions or Basis Functions. 
+
+They transform the input state into a different space, but note that since our value function is still defined as a linear combination of these features, we can still use linear function approximation.
+
+**Radial Basis Functions**
+
+RBF is a very common form of Kernels used for this purpose.
+
+The kernel is described:
+$$
+\phi_i(s) = \exp{\Big( -\dfrac{||s-c_i||^2}{2\sigma^2_i}\Big)}
+$$
+Essentially think of the current state S as a location in the continuous state space.
+Each Basis Function is shown as a blob, the closer the state is to the center of this blob the higher the response returned by the function and the further you go the response falls off gradually with the radius. 
+
+____
+
+#### 4.3 Non-Linear Function Approximation 
+
+Let pass our linear responds $\hat{q}(s,a, \mathbf{w}) = \mathbf{x}(s,a)^\intercal \cdot \mathbf{w}$ obtained using the dot product, through some non-linear function $f$:
+$$
+\hat{q}(s,a, \mathbf{w}) = f\big(\mathbf{x}(s,a)^\intercal \cdot \mathbf{w} \big)
+$$
+This is the basis of artificial neural networks. Such a non-linear function $f$ is generally called an activation function and immensely increase the representational capacity of our approximator.
+
+We can iteratively update the parameters of any such function using gradient descent:
+$$
+\Delta\mathbf{w} = \alpha \Big( v_\pi(s) - \hat{v}(s, \mathbf{w}) \Big) \triangledown_w \hat{v}(s,\mathbf{w})
+$$
