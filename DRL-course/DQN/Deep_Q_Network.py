@@ -26,7 +26,7 @@ if is_ipython:
 plt.ion()
 
 
-def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
+def dqn(agent, n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
     """Deep Q-Learning.
 
     Params
@@ -40,6 +40,7 @@ def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_deca
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start  # initialize epsilon
+    best_avg = 280.0
     for i_episode in range(1, n_episodes + 1):
         state = env.reset()
         score = 0
@@ -57,11 +58,11 @@ def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_deca
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-        if np.mean(scores_window) >= 200.0:
+        if np.mean(scores_window) >= best_avg:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode - 100,
                                                                                          np.mean(scores_window)))
             torch.save(agent.qnetwork_local.state_dict(), 'checkpoint.pth')
-            break
+            best_avg = np.mean(scores_window)
     return scores
 
 
@@ -111,6 +112,7 @@ if __name__ == '__main__':
 
     # In[ ]:
     if ex2:
+        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
         scores = dqn(agent)
 
         # plot the scores
@@ -146,6 +148,26 @@ if __name__ == '__main__':
                     break
 
         env.close()
+    if ex3:
+        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
+
+        for i in range(3):
+            state = env.reset()
+            for j in range(500):
+                action = agent.act(state)
+
+                env.render()
+                state, reward, done, _ = env.step(action)
+                if done:
+                    break
+
+        env.close()
+
+
+
+
+
+
 
     # ### 5. Explore
     #

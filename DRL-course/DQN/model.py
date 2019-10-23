@@ -22,19 +22,11 @@ class QNetwork(nn.Module):
         "*** YOUR CODE HERE ***"
 
         self.model = nn.Sequential(
-            nn.Linear(state_size, 32),
-            nn.Dropout2d(p=0.2, inplace=False),
+            nn.Linear(state_size, 512),
             nn.ReLU(),
-            nn.Linear(32, 64),
-            nn.Dropout2d(p=0.2, inplace=False),
+            nn.Linear(512, 512),
             nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.Dropout2d(p=0.2, inplace=False),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.Dropout2d(p=0.2, inplace=False),
-            nn.ReLU(),
-            nn.Linear(128, self.action_size)
+            nn.Linear(512, self.action_size)
         )
 
     def forward(self, state):
