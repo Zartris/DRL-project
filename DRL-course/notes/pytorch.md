@@ -1,5 +1,10 @@
 # Pytorch help
 
+building up the module can be done in many ways. Here is a link to some of the ways:
+https://github.com/FrancescoSaverioZuppichini/Pytorch-how-and-when-to-use-Module-Sequential-ModuleList-and-ModuleDict
+
+#### Notes from lecture
+
 ~~~~Python
 import torch.nn as nn
 import torch.nn.functional as F
