@@ -12,6 +12,7 @@
 
 import gym
 
+from double_dqn_agent import DoubleDQNAgent
 from dqn_agent import Agent
 import random
 import torch
@@ -26,7 +27,7 @@ if is_ipython:
 plt.ion()
 
 
-def dqn(agent, n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
+def dqn(agent, scheduler=None, n_episodes=2000000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
     """Deep Q-Learning.
 
     Params
@@ -55,6 +56,8 @@ def dqn(agent, n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_dec
         scores_window.append(score)  # save most recent score
         scores.append(score)  # save most recent score
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
+        if scheduler is not None:
+            scheduler.step(np.mean(scores_window), i_episode)
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
@@ -68,8 +71,9 @@ def dqn(agent, n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_dec
 
 if __name__ == '__main__':
     ex1 = False
-    ex2 = True
+    ex2 = False
     ex3 = False
+    ex4 = True
     # ### 2. Instantiate the Environment and Agent
     #
     # Initialize the environment in the code cell below.
@@ -90,9 +94,10 @@ if __name__ == '__main__':
     # You can find the solution files, along with saved model weights for a trained agent, in the `solution/` folder.  (_Note that there are many ways to solve this exercise, and the "solution" is just one way of approaching the problem, to yield a trained agent._)
 
     # In[ ]:
-    agent = Agent(state_size=8, action_size=4, seed=0)
+
     # watch an untrained agent
     if ex1:
+        agent = Agent(state_size=8, action_size=4, seed=0)
         state = env.reset()
         # img = plt.imshow(env.render(mode='rgb_array'))
         for j in range(200):
@@ -112,8 +117,12 @@ if __name__ == '__main__':
 
     # In[ ]:
     if ex2:
+        agent = Agent(state_size=8, action_size=4, seed=0)
         agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
-        scores = dqn(agent)
+        agent.qnetwork_target.load_state_dict(torch.load('checkpoint.pth'))
+        scheduler = agent.scheduler
+
+        scores = dqn(agent, scheduler=scheduler)
 
         # plot the scores
         fig = plt.figure()
@@ -149,9 +158,10 @@ if __name__ == '__main__':
 
         env.close()
     if ex3:
+        agent = Agent(state_size=8, action_size=4, seed=0)
         agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
 
-        for i in range(3):
+        for i in range(10):
             state = env.reset()
             for j in range(500):
                 action = agent.act(state)
@@ -162,11 +172,47 @@ if __name__ == '__main__':
                     break
 
         env.close()
+    if ex4:
+        agent = DoubleDQNAgent(state_size=8, action_size=4, seed=0)
+        # agent.qnetwork_local.load_state_dict(torch.load('checkpoint_double.pth'))
+        # agent.qnetwork_target.load_state_dict(torch.load('checkpoint_double.pth'))
+        # scheduler = agent.scheduler
 
+        scores = dqn(agent)
 
+        # plot the scores
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.plot(np.arange(len(scores)), scores)
+        plt.ylabel('Score')
+        plt.xlabel('Episode #')
+        plt.show()
 
+        # ### 4. Watch a Smart Agent!
+        #
+        # In the next code cell, you will load the trained weights from file to watch a smart agent!
 
+        # In[ ]:
 
+        # load the weights from file
+
+        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
+
+        for i in range(3):
+            state = env.reset()
+            # img = plt.imshow(env.render(mode='rgb_array'))
+            for j in range(200):
+                action = agent.act(state)
+                # img.set_data(env.render(mode='rgb_array'))
+                # plt.axis('off')
+                # display.display(plt.gcf())
+                # display.clear_output(wait=True)
+                env.render()
+                state, reward, done, _ = env.step(action)
+                if done:
+                    break
+
+        env.close()
 
 
     # ### 5. Explore

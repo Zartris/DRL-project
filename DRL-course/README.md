@@ -20,16 +20,28 @@ For Books login to https://www.manning.com/dashboard
 
 
 
-
-
 ## Questions for next session:
 
-**Monte carlo**
+1. What is MAXSQN 
+   * guess max soft(soft Q learning) Q-network or maybe S is for Stochastic??? I don't know.
+   * I found somewhere in Japanese a description: maxsqn is based on Q-value estimation algorithm, combining double-Q learning and entropy regularization (SQL, soft Q learning ).
+     * But I cannot find any papers about it
 
-1. Having a hard time Validating the result, is there a way to know that the Q-table wont improve from this point on, like we kinda have in "Supervised learning" converging.
+## Future reading
 
+1. https://github.com/createamind/DRL
 
+   - Good papers on "new" (or in my case new) DRL techniques.
 
-**TD - method**
+2. https://spinningup.openai.com/en/latest/spinningup/rl_intro2.html
 
-1. Q-learning is that both the sarsamax and the sarsa expected?
+   - An inside in different methods
+
+     
+
+## Library for good links and papers
+
+This is more of a space if I think it is relevant to save a link for future use :) 
+
+[Nothing yet]
+

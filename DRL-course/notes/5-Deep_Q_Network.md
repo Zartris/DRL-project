@@ -6,6 +6,10 @@ Q-learning is a form of Temporal Difference (TD) learning
 
 
 
+For the following improvements to Deep Q-Network a more detailed description can be found here:
+
+https://www.freecodecamp.org/news/improvements-in-deep-q-learning-dueling-double-dqn-prioritized-experience-replay-and-fixed-58b130cc5682/
+
 ____
 
 #### 2. Experience Replay
@@ -39,9 +43,33 @@ Lets call it target Q-Network and primary Q-Network, where the target Q-Network 
 
 ____
 
-#### 4. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
+#### 4. Double DQN
 
-**4.1 Agent - Functionality**
+Deep Q-Learning [tends to overestimate](https://www.ri.cmu.edu/pub_files/pub1/thrun_sebastian_1993_1/thrun_sebastian_1993_1.pdf) action values.  [Double Q-Learning](https://arxiv.org/abs/1509.06461) has been shown to work well in practice to help with this. 
+
+
+
+____
+
+#### 5. Prioritized Experience Replay
+
+Deep Q-Learning samples experience transitions *uniformly* from a replay memory.  [Prioritized experienced replay](https://arxiv.org/abs/1511.05952) is based on the idea that the agent can learn more effectively from some transitions than from others, and the more important transitions should be sampled with higher probability. 
+
+
+
+____
+
+#### 6. Duelling DQN
+
+Currently, in order to determine which states are (or are not) valuable, we have to estimate the corresponding action values *for each action*.  However, by replacing the traditional Deep Q-Network (DQN) architecture with a [dueling architecture](https://arxiv.org/abs/1511.06581), we can assess the value of each state, without having to learn the effect of each action.
+
+
+
+____
+
+#### 7. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
+
+**7.1 Agent - Functionality**
 
 How we initialize the agent, this can of cause be done in sooo many ways, but here is an example:
 
@@ -111,7 +139,7 @@ def act(self, state, eps=0.):
 
 
 
-**4.2 Agent - Update network**
+**7.2 Agent - Update network**
 
 Here we see an example on how we can update the network from a batch of experience.
 
@@ -131,9 +159,9 @@ def learn(batch, GAMMA):
     
     # Compute target Q-value, returns a vector of max Q_value for each next_state.
     Qval_next_state = Qn_target(next_states).detach()
-    # Find the best Q-value for each next_state
-    max_Qval_nState = Qval_next_state.max(1)[0]
-    # Unsqueezing the tensor
+    # Find the best Q-value for each next_state returns the max value in a list and the position of the max value
+    max_Qval_nState, max_Qval_indice = Qval_next_state.max(1)
+    # Unsqueezing the tensor to make a vector and not a list.
     max_Qval_nState = max_Qval_nState.unsqueeze(1)
     
     # Finding the target value for current state
@@ -179,7 +207,7 @@ def soft_update(self, local_model, target_model, tau):
 
 
 
-**4.3 Experience Replay**
+**7.3 Experience Replay**
 
 This is an implementation of the Experience Replay, we call it the replay buffer.
 
@@ -244,7 +272,7 @@ class ReplayBuffer:
         return len(self.memory)
 ~~~~
 
-**4.5 Main function**
+**7.5 Main function**
 
 ```python
 def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
