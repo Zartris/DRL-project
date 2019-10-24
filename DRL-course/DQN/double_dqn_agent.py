@@ -8,7 +8,7 @@ from experience_replay import PrioritizedReplayBuffer
 
 class DoubleDQNAgent(Agent):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    BUFFER_SIZE = (2**17)  # replay buffer size
+    BUFFER_SIZE = (2 ** 17)  # replay buffer size
     BATCH_SIZE = 64  # minibatch size
     GAMMA = 0.99  # discount factor
     TAU = 1e-3  # for soft update of target parameters
@@ -23,7 +23,8 @@ class DoubleDQNAgent(Agent):
 
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
-        self.memory.add((state, action, reward, next_state, done), reward)
+        error = reward
+        self.memory.add((state, action, reward, next_state, done), error)
 
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % self.UPDATE_EVERY
@@ -85,3 +86,25 @@ class DoubleDQNAgent(Agent):
         td_error = Q_expected - Q_targets
         weighted_squared_error = is_weights * td_error * td_error
         return torch.sum(weighted_squared_error) / torch.numel(weighted_squared_error)
+
+    def compute_error(self, state, action, reward, next_state, done):
+        self.qnetwork_local.eval()
+        self.qnetwork_target.eval()
+        state = torch.from_numpy(state).to(self.device)
+        next_state = torch.from_numpy(next_state).to(self.device)
+        action = torch.as_tensor(action).to(self.device)
+        val, max_actions_Snext_local = self.qnetwork_local(next_state).detach().max(0)
+
+        # Getting the Q-value for these actions (using weight w^-)
+        Q_targets_next = self.qnetwork_target(next_state).detach()[max_actions_Snext_local]
+
+        # Compute Q targets for current states (TD-target)
+        Q_targets = reward + (self.GAMMA * Q_targets_next * (1 - done))
+
+        # Get expected Q values from local model
+        Q_expected = self.qnetwork_local(state)[action]
+
+        error = np.abs((Q_expected - Q_targets).detach().cpu().numpy())
+        self.qnetwork_local.train()
+        self.qnetwork_target.train()
+        return error

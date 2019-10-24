@@ -45,7 +45,7 @@ class ReplayBuffer:
         dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(
             self.device)
 
-        return (states, actions, rewards, next_states, dones)
+        return states, actions, rewards, next_states, dones
 
     def __len__(self):
         """Return the current size of internal memory."""
@@ -55,9 +55,9 @@ class ReplayBuffer:
 # MODIFIED TO USE PRIORITY
 class PrioritizedReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
-    absolute_error_upper = 1.  # clipped abs error
+    absolute_error_upper = 4.  # clipped abs error
 
-    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.01, alpha=0.6, beta=0.4, beta_increase=1e-4):
+    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.01, alpha=0.6, beta=0.4, beta_increase=1e-3):
         """Initialize a ReplayBuffer object.
 
         Params
@@ -133,30 +133,37 @@ class PrioritizedReplayBuffer:
         self.beta = np.amin([1., self.beta + self.beta_increase])  # max = 1
 
         # Calculate the max_weight
-        p_min = np.amin(self.memory_tree.tree[-self.memory_tree.capacity:]) / self.memory_tree.total_priority
-        max_weight = (p_min * self.batch_size) ** (-self.beta)
+        # p_min = np.amin(self.memory_tree.tree[-self.memory_tree.capacity:]) / self.memory_tree.total_priority
+        # if p_min == 0:
+        #     p_min = 0.0001
+        # max_weight = (p_min * self.batch_size) ** (-self.beta)
 
         for i in range(self.batch_size):
             """
             A value is uniformly sampled from each range
             """
             a, b = priority_segment * i, priority_segment * (i + 1)
-            value = np.random.uniform(a, b)
 
-            """
-            Experience that corresponds to each value is retrieved
-            """
-            index, priority, data = self.memory_tree.get_leaf(value)
+            # This while is to counter that we find a leaf that is not populated yet.
+            # It happens when the buffer size is very large.
+            data, index, priority = 0, 0, 0
+            while data == 0:
+                value = np.random.uniform(a, b)
+
+                """
+                Experience that corresponds to each value is retrieved
+                """
+                index, priority, data = self.memory_tree.get_leaf(value)
 
             # P(i) = p_i**a / sum_k p_k**a
             sampling_probabilities = priority / self.memory_tree.total_priority
             # (1/N * 1/P(i))**b and to normalize it we divide with max_weight
             # So is_weights[i] = (1/N * 1/P(i))**b
-            is_weights[i] = np.power(self.batch_size * sampling_probabilities, -self.beta) / max_weight
+            is_weights[i] = np.power(self.batch_size * sampling_probabilities, -self.beta)
 
             idxs[i] = index
             minibatch.append(data)
-
+        is_weights /= is_weights.max()
         return idxs, minibatch, is_weights
 
     def batch_update(self, idxs, errors):
