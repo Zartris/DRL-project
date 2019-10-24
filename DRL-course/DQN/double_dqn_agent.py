@@ -1,23 +1,38 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
 
 from dqn_agent import Agent
-
-BUFFER_SIZE = int(1e5)  # replay buffer size
-BATCH_SIZE = 64  # minibatch size
-GAMMA = 0.99  # discount factor
-TAU = 1e-3  # for soft update of target parameters
-LR = 5e-4  # learning rate
-UPDATE_EVERY = 4  # how often to update the network
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+from experience_replay import PrioritizedReplayBuffer
 
 
 class DoubleDQNAgent(Agent):
-    def __init__(self, state_size, action_size, seed):
-        super().__init__(state_size, action_size, seed)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    BUFFER_SIZE = (2**17)  # replay buffer size
+    BATCH_SIZE = 64  # minibatch size
+    GAMMA = 0.99  # discount factor
+    TAU = 1e-3  # for soft update of target parameters
+    LR = 5e-4  # learning rate
+    UPDATE_EVERY = 4  # how often to update the network
 
-    def learn(self, experiences, gamma):
+    def __init__(self, state_size, action_size, seed, continues=False):
+        super().__init__(state_size, action_size, seed)
+        # Override replaybuffer to use priority replay
+        self.memory = PrioritizedReplayBuffer(self.BUFFER_SIZE, self.BATCH_SIZE, seed, self.device)
+        self.continues = continues
+
+    def step(self, state, action, reward, next_state, done):
+        # Save experience in replay memory
+        self.memory.add((state, action, reward, next_state, done), reward)
+
+        # Learn every UPDATE_EVERY time steps.
+        self.t_step = (self.t_step + 1) % self.UPDATE_EVERY
+        if self.t_step == 0:
+            # If enough samples are available in memory, get random subset and learn
+            if len(self.memory) > self.BATCH_SIZE:
+                self.learn(self.GAMMA)
+
+    def learn(self, gamma):
         """Update value parameters using given batch of experience tuples.
 
         Params
@@ -25,7 +40,18 @@ class DoubleDQNAgent(Agent):
             experiences (Tuple[torch.Variable]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
-        states, actions, rewards, next_states, dones = experiences
+        idxs, experiences, is_weights = self.memory.sample()
+        states = torch.from_numpy(np.vstack([e[0] for e in experiences if e is not None])).float().to(self.device)
+        if self.continues:
+            actions = torch.from_numpy(np.vstack([e[1] for e in experiences if e is not None])).float().to(self.device)
+        else:
+            actions = torch.from_numpy(np.vstack([e[1] for e in experiences if e is not None])).long().to(self.device)
+        rewards = torch.from_numpy(np.vstack([e[2] for e in experiences if e is not None])).float().to(self.device)
+        next_states = torch.from_numpy(np.vstack([e[3] for e in experiences if e is not None])).float().to(self.device)
+        dones = torch.from_numpy(np.vstack([e[4] for e in experiences if e is not None]).astype(np.uint8)).float().to(
+            self.device)
+
+        is_weights = torch.from_numpy(is_weights).float().to(self.device)
 
         "*** YOUR CODE HERE ***"
         # Getting the max action of local network (using weights w)
@@ -40,11 +66,22 @@ class DoubleDQNAgent(Agent):
         # Get expected Q values from local model
         Q_expected = self.qnetwork_local(states).gather(1, actions)
 
+        errors = np.abs((Q_expected - Q_targets).detach().cpu().numpy())
+        self.memory.batch_update(idxs, errors)
+
         # Compute loss
-        loss = F.mse_loss(Q_expected, Q_targets)
+        # loss = F.mse_loss(Q_expected, Q_targets)
+        loss = self.my_weighted_mse(Q_expected, Q_targets, is_weights)
         # Minimize the loss
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         # ------------------- update target network ------------------- #
-        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)
+        self.soft_update(self.qnetwork_local, self.qnetwork_target, self.TAU)
+
+    @staticmethod
+    def my_weighted_mse(Q_expected, Q_targets, is_weights):
+        """Custom loss function that takes into account the importance-sampling weights."""
+        td_error = Q_expected - Q_targets
+        weighted_squared_error = is_weights * td_error * td_error
+        return torch.sum(weighted_squared_error) / torch.numel(weighted_squared_error)

@@ -57,6 +57,8 @@ Deep Q-Learning samples experience transitions *uniformly* from a replay memory.
 
 
 
+Implementation: https://github.com/Ullar-Kask/TD3-PER/tree/master/Pytorch/src
+
 ____
 
 #### 6. Duelling DQN
