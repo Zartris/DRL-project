@@ -55,9 +55,9 @@ class ReplayBuffer:
 # MODIFIED TO USE PRIORITY
 class PrioritizedReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
-    absolute_error_upper = 4.  # clipped abs error
+    absolute_error_upper = 3.  # clipped abs error
 
-    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.01, alpha=0.6, beta=0.4, beta_increase=1e-3):
+    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.01, alpha=0.6, beta=0.6, beta_increase=1e-3):
         """Initialize a ReplayBuffer object.
 
         Params
@@ -157,10 +157,13 @@ class PrioritizedReplayBuffer:
 
             # P(i) = p_i**a / sum_k p_k**a
             sampling_probabilities = priority / self.memory_tree.total_priority
+            if priority > self.absolute_error_upper:
+                debug = 0
             # (1/N * 1/P(i))**b and to normalize it we divide with max_weight
             # So is_weights[i] = (1/N * 1/P(i))**b
             is_weights[i] = np.power(self.batch_size * sampling_probabilities, -self.beta)
-
+            if is_weights[i] > self.absolute_error_upper:
+                debug = 0
             idxs[i] = index
             minibatch.append(data)
         is_weights /= is_weights.max()

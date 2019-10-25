@@ -12,8 +12,8 @@
 
 import gym
 
-from double_dqn_agent import DoubleDQNAgent
-from dqn_agent import Agent
+from agents.double_dqn_agent import DoubleDQNAgent, DoubleDQNAgentPER
+from agents.dqn_agent import DQNAgent, DQNAgentPER
 import random
 import torch
 import numpy as np
@@ -27,7 +27,8 @@ if is_ipython:
 plt.ion()
 
 
-def dqn(agent, scheduler=None, n_episodes=2000000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
+def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, max_t=1000, eps_start=1.0, eps_end=0.01,
+        eps_decay=0.995):
     """Deep Q-Learning.
 
     Params
@@ -64,160 +65,88 @@ def dqn(agent, scheduler=None, n_episodes=2000000, max_t=1000, eps_start=1.0, ep
         if np.mean(scores_window) >= best_avg:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode - 100,
                                                                                          np.mean(scores_window)))
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoint.pth')
+            torch.save(agent.qnetwork_local.state_dict(), str(save_file))
             best_avg = np.mean(scores_window)
     return scores
 
 
 if __name__ == '__main__':
-    ex1 = False
-    ex2 = False
-    ex3 = False
-    ex4 = True
-    # ### 2. Instantiate the Environment and Agent
-    #
-    # Initialize the environment in the code cell below.
-
-    # In[ ]:
-
+    stop = False
     env = gym.make('LunarLander-v2')
     env.seed(0)
     print('State shape: ', env.observation_space.shape)
     print('Number of actions: ', env.action_space.n)
 
-    # Before running the next code cell, familiarize yourself with the code in **Step 2** and **Step 3** of this notebook, along with the code in `dqn_agent.py` and `model.py`.  Once you have an understanding of how the different files work together,
-    # - Define a neural network architecture in `model.py` that maps states to action values.  This file is mostly empty - it's up to you to define your own deep Q-network!
-    # - Finish the `learn` method in the `Agent` class in `dqn_agent.py`.  The sampled batch of experience tuples is already provided for you; you need only use the local and target Q-networks to compute the loss, before taking a step towards minimizing the loss.
-    #
-    # Once you have completed the code in `dqn_agent.py` and `model.py`, run the code cell below.  (_If you end up needing to make multiple changes and get unexpected behavior, please restart the kernel and run the cells from the beginning of the notebook!_)
-    #
-    # You can find the solution files, along with saved model weights for a trained agent, in the `solution/` folder.  (_Note that there are many ways to solve this exercise, and the "solution" is just one way of approaching the problem, to yield a trained agent._)
+    test_vanilla_DQN = False
+    test_double_DQN = True
+    test_DQN_PER = False
+    test_double_DQN_PER = False
 
-    # In[ ]:
+    if test_vanilla_DQN:
+        name = "DQNAgent"
+        agent = DQNAgent(state_size=8, action_size=4, seed=0)
+        save_file = "DQNAgent_checkpoint.pth"
+    elif test_double_DQN:
+        name = "DoubleDQNAgent"
+        agent = DoubleDQNAgent(state_size=8, action_size=4, seed=0)
+        save_file = "DoubleDQNAgent_checkpoint.pth"
+    elif test_DQN_PER:
+        name = "DQNAgentPER"
+        agent = DQNAgentPER(state_size=8, action_size=4, seed=0)
+        save_file = "DQNAgentPER_checkpoint.pth"
+    elif test_double_DQN_PER:
+        name = "DoubleDQNAgentPER"
+        agent = DoubleDQNAgentPER(state_size=8, action_size=4, seed=0)
+        save_file = "DoubleDQNAgentPER_checkpoint.pth"
+    else:
+        print("Pick an agent")
+        stop = True
 
-    # watch an untrained agent
-    if ex1:
-        agent = Agent(state_size=8, action_size=4, seed=0)
-        state = env.reset()
-        # img = plt.imshow(env.render(mode='rgb_array'))
-        for j in range(200):
-            action = agent.act(state)
-            # img.set_data(env.render(mode='rgb_array'))
-            # plt.axis('off')
-            env.render()
-            state, reward, done, _ = env.step(action)
-            if done:
-                break
+    if not stop:
+        test_untrained_agent = False
+        train_agent = True
 
-        env.close()
-
-    # ### 3. Train the Agent with DQN
-    #
-    # Run the code cell below to train the agent from scratch.  You are welcome to amend the supplied values of the parameters in the function, to try to see if you can get better performance!
-
-    # In[ ]:
-    if ex2:
-        agent = Agent(state_size=8, action_size=4, seed=0)
-        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
-        agent.qnetwork_target.load_state_dict(torch.load('checkpoint.pth'))
-        scheduler = agent.scheduler
-
-        scores = dqn(agent, scheduler=scheduler)
-
-        # plot the scores
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plt.plot(np.arange(len(scores)), scores)
-        plt.ylabel('Score')
-        plt.xlabel('Episode #')
-        plt.show()
-
-        # ### 4. Watch a Smart Agent!
-        #
-        # In the next code cell, you will load the trained weights from file to watch a smart agent!
-
-        # In[ ]:
-
-        # load the weights from file
-
-        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
-
-        for i in range(3):
+        # watch an untrained agent
+        if test_untrained_agent:
             state = env.reset()
             # img = plt.imshow(env.render(mode='rgb_array'))
             for j in range(200):
                 action = agent.act(state)
                 # img.set_data(env.render(mode='rgb_array'))
                 # plt.axis('off')
-                # display.display(plt.gcf())
-                # display.clear_output(wait=True)
                 env.render()
                 state, reward, done, _ = env.step(action)
                 if done:
                     break
 
-        env.close()
-    if ex3:
-        agent = Agent(state_size=8, action_size=4, seed=0)
-        agent.qnetwork_local.load_state_dict(torch.load('checkpoint.pth'))
+            env.close()
 
-        for i in range(10):
-            state = env.reset()
-            for j in range(500):
-                action = agent.act(state)
+        if train_agent:
+            print("train", str(name))
+            scores = dqn(agent, save_file=save_file, n_episodes = 1000)
 
-                env.render()
-                state, reward, done, _ = env.step(action)
-                if done:
-                    break
+            # plot the scores
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            plt.plot(np.arange(len(scores)), scores)
+            plt.ylabel('Score')
+            plt.xlabel('Episode #')
+            plt.show()
+            # Load best
+            agent.qnetwork_local.load_state_dict(torch.load(save_file))
 
-        env.close()
-    if ex4:
-        agent = DoubleDQNAgent(state_size=8, action_size=4, seed=0)
-        # agent.qnetwork_local.load_state_dict(torch.load('checkpoint_double.pth'))
-        # agent.qnetwork_target.load_state_dict(torch.load('checkpoint_double.pth'))
-        # scheduler = agent.scheduler
+            for i in range(3):
+                state = env.reset()
+                # img = plt.imshow(env.render(mode='rgb_array'))
+                for j in range(200):
+                    action = agent.act(state)
+                    # img.set_data(env.render(mode='rgb_array'))
+                    # plt.axis('off')
+                    # display.display(plt.gcf())
+                    # display.clear_output(wait=True)
+                    env.render()
+                    state, reward, done, _ = env.step(action)
+                    if done:
+                        break
 
-        scores = dqn(agent)
-
-        # plot the scores
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plt.plot(np.arange(len(scores)), scores)
-        plt.ylabel('Score')
-        plt.xlabel('Episode #')
-        plt.show()
-
-        # ### 4. Watch a Smart Agent!
-        #
-        # In the next code cell, you will load the trained weights from file to watch a smart agent!
-
-        # In[ ]:
-
-        # load the weights from file
-
-        agent.qnetwork_local.load_state_dict(torch.load('checkpoint_double.pth'))
-
-        for i in range(3):
-            state = env.reset()
-            img = plt.imshow(env.render(mode='rgb_array'))
-            for j in range(200):
-                action = agent.act(state)
-                img.set_data(env.render(mode='rgb_array'))
-                plt.axis('off')
-                # display.display(plt.gcf())
-                # display.clear_output(wait=True)
-                env.render()
-                state, reward, done, _ = env.step(action)
-                if done:
-                    break
-
-        env.close()
-
-
-    # ### 5. Explore
-    #
-    # In this exercise, you have implemented a DQN agent and demonstrated how to use it to solve an OpenAI Gym environment.  To continue your learning, you are encouraged to complete any (or all!) of the following tasks:
-    # - Amend the various hyperparameters and network architecture to see if you can get your agent to solve the environment faster.  Once you build intuition for the hyperparameters that work well with this environment, try solving a different OpenAI Gym task with discrete actions!
-    # - You may like to implement some improvements such as prioritized experience replay, Double DQN, or Dueling DQN!
-    # - Write a blog post explaining the intuition behind the DQN algorithm and demonstrating how to use it to solve an RL environment of your choosing.
+            env.close()
