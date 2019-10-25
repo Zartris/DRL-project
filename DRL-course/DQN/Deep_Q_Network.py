@@ -8,7 +8,7 @@
 # ### 1. Import the Necessary Packages
 
 # In[ ]:
-
+import time
 
 import gym
 
@@ -41,11 +41,14 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
     """
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
+    time_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start  # initialize epsilon
     best_avg = 280.0
     for i_episode in range(1, n_episodes + 1):
+
         state = env.reset()
         score = 0
+        start = time.time()
         for t in range(max_t):
             action = agent.act(state, eps)
             next_state, reward, done, _ = env.step(action)
@@ -54,17 +57,24 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
             score += reward
             if done:
                 break
+        time_window.append(time.time() - start)
         scores_window.append(score)  # save most recent score
         scores.append(score)  # save most recent score
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
         if scheduler is not None:
             scheduler.step(np.mean(scores_window), i_episode)
-        print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
+        print('\rEpisode {}\tAverage Score: {:.2f}\tAverage Time pr episode {:.2f} ms'.format(i_episode,
+                                                                                              np.mean(scores_window),
+                                                                                              np.mean(time_window)),
+              end="")
         if i_episode % 100 == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
+            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} ms'.format(i_episode, np.mean(scores_window),
+                                                                                    np.mean(time_window) * (
+                                                                                            n_episodes - i_episode)))
         if np.mean(scores_window) >= best_avg:
-            print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode - 100,
-                                                                                         np.mean(scores_window)))
+            print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} ms'.format(
+                i_episode - 100,
+                np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
             torch.save(agent.qnetwork_local.state_dict(), str(save_file))
             best_avg = np.mean(scores_window)
     return scores
@@ -78,8 +88,8 @@ if __name__ == '__main__':
     print('Number of actions: ', env.action_space.n)
 
     test_vanilla_DQN = False
-    test_double_DQN = True
-    test_DQN_PER = False
+    test_double_DQN = False
+    test_DQN_PER = True
     test_double_DQN_PER = False
 
     if test_vanilla_DQN:
@@ -103,6 +113,7 @@ if __name__ == '__main__':
         stop = True
 
     if not stop:
+        print("device used", agent.device)
         test_untrained_agent = False
         train_agent = True
 
@@ -123,7 +134,7 @@ if __name__ == '__main__':
 
         if train_agent:
             print("train", str(name))
-            scores = dqn(agent, save_file=save_file, n_episodes = 1000)
+            scores = dqn(agent, save_file=save_file, n_episodes=1000)
 
             # plot the scores
             fig = plt.figure()

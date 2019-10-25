@@ -1,4 +1,16 @@
-# SCORE COMPARISON
+# SCORE COMPARISON (LunarLander-v2 environment)
+
+#### VANILLA DQN_AGENT
+
+
+
+#### DOUBLE DQN_AGENT
+
+
+
+#### VANILLA DQN_AGENT WITH PER
+
+
 
 #### DOUBLE DQN_AGENT WITH PER
 
@@ -13,3 +25,12 @@ Episode 800	Average Score: 233.67
 Episode 900	Average Score: 218.20
 Episode 1000	Average Score: 235.86
 
+
+
+
+
+## Notes
+
+* PER = Prioritised Experience Replay
+
+* DQN = Deep Q-Network
