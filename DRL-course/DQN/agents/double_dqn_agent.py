@@ -11,7 +11,7 @@ class DoubleDQNAgent(DQNAgent):
     BUFFER_SIZE = (2 ** 20)  # replay buffer size
     BATCH_SIZE = 64  # minibatch size
     GAMMA = 0.99  # discount factor
-    TAU = 1e-3  # for soft update of target parameters
+    TAU = 1e-4  # for soft update of target parameters
     LR = 5e-4  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
 

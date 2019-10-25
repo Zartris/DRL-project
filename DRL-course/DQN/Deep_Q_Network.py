@@ -41,7 +41,7 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
     """
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
-    time_window = deque(maxlen=100)  # last 100 scores
+    time_window = deque(maxlen=10)  # last 100 scores
     eps = eps_start  # initialize epsilon
     best_avg = 280.0
     for i_episode in range(1, n_episodes + 1):
@@ -63,16 +63,16 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
         if scheduler is not None:
             scheduler.step(np.mean(scores_window), i_episode)
-        print('\rEpisode {}\tAverage Score: {:.2f}\tAverage Time pr episode {:.2f} ms'.format(i_episode,
+        print('\rEpisode {}\tAverage Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(i_episode,
                                                                                               np.mean(scores_window),
                                                                                               np.mean(time_window)),
               end="")
         if i_episode % 100 == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} ms'.format(i_episode, np.mean(scores_window),
+            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode, np.mean(scores_window),
                                                                                     np.mean(time_window) * (
                                                                                             n_episodes - i_episode)))
         if np.mean(scores_window) >= best_avg:
-            print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} ms'.format(
+            print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode - 100,
                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
             torch.save(agent.qnetwork_local.state_dict(), str(save_file))

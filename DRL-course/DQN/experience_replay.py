@@ -57,7 +57,7 @@ class PrioritizedReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
     absolute_error_upper = 3.  # clipped abs error
 
-    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.01, alpha=0.6, beta=0.6, beta_increase=1e-3):
+    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.001, alpha=0.6, beta=0.4, beta_increase=1e-2):
         """Initialize a ReplayBuffer object.
 
         Params
