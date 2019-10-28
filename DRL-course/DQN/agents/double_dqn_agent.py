@@ -15,8 +15,8 @@ class DoubleDQNAgent(DQNAgent):
     LR = 5e-4  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
 
-    def __init__(self, state_size, action_size, seed):
-        super().__init__(state_size, action_size, seed)
+    def __init__(self, state_size, action_size, seed, models):
+        super().__init__(state_size, action_size, seed, models)
 
     def learn(self, gamma):
         """Update value parameters using given batch of experience tuples.
@@ -60,8 +60,8 @@ class DoubleDQNAgentPER(DQNAgent):
     LR = 5e-4  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
 
-    def __init__(self, state_size, action_size, seed, continues=False):
-        super().__init__(state_size, action_size, seed)
+    def __init__(self, state_size, action_size, seed, models, continues=False):
+        super().__init__(state_size, action_size, seed, models)
         # Override replaybuffer to use priority replay
         self.memory = PrioritizedReplayBuffer(self.BUFFER_SIZE, self.BATCH_SIZE, seed, self.device)
         self.continues = continues

@@ -61,7 +61,7 @@ Implementation: https://github.com/Ullar-Kask/TD3-PER/tree/master/Pytorch/src
 
 ____
 
-#### 6. Duelling DQN
+#### 6. Duelling DQN (aka. DDQN)
 
 Currently, in order to determine which states are (or are not) valuable, we have to estimate the corresponding action values *for each action*.  However, by replacing the traditional Deep Q-Network (DQN) architecture with a [dueling architecture](https://arxiv.org/abs/1511.06581), we can assess the value of each state, without having to learn the effect of each action.
 

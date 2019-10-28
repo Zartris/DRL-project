@@ -20,6 +20,8 @@ import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
 
+from model import QNetwork, DuelingQNetwork
+
 is_ipython = 'inline' in plt.get_backend()
 if is_ipython:
     from IPython import display
@@ -43,7 +45,7 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
     scores_window = deque(maxlen=100)  # last 100 scores
     time_window = deque(maxlen=10)  # last 100 scores
     eps = eps_start  # initialize epsilon
-    best_avg = 280.0
+    best_avg = 200.0
     for i_episode in range(1, n_episodes + 1):
 
         state = env.reset()
@@ -64,13 +66,16 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
         if scheduler is not None:
             scheduler.step(np.mean(scores_window), i_episode)
         print('\rEpisode {}\tAverage Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(i_episode,
-                                                                                              np.mean(scores_window),
-                                                                                              np.mean(time_window)),
+                                                                                                   np.mean(
+                                                                                                       scores_window),
+                                                                                                   np.mean(
+                                                                                                       time_window)),
               end="")
         if i_episode % 100 == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode, np.mean(scores_window),
-                                                                                    np.mean(time_window) * (
-                                                                                            n_episodes - i_episode)))
+            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
+                                                                                         np.mean(scores_window),
+                                                                                         np.mean(time_window) * (
+                                                                                                 n_episodes - i_episode)))
         if np.mean(scores_window) >= best_avg:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode - 100,
@@ -86,6 +91,18 @@ if __name__ == '__main__':
     env.seed(0)
     print('State shape: ', env.observation_space.shape)
     print('Number of actions: ', env.action_space.n)
+    state_size = 8
+    action_size = 4
+    seed = 0
+    test_DQN_model = False
+    test_Dueling_DQN_model = True
+
+    if test_DQN_model:
+        models = (QNetwork(state_size=state_size, action_size=action_size, seed=seed),
+                  QNetwork(state_size=state_size, action_size=action_size, seed=seed))
+    else:
+        models = (DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed),
+                  DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed))
 
     test_vanilla_DQN = False
     test_double_DQN = False
@@ -94,19 +111,19 @@ if __name__ == '__main__':
 
     if test_vanilla_DQN:
         name = "DQNAgent"
-        agent = DQNAgent(state_size=8, action_size=4, seed=0)
+        agent = DQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=models)
         save_file = "DQNAgent_checkpoint.pth"
     elif test_double_DQN:
         name = "DoubleDQNAgent"
-        agent = DoubleDQNAgent(state_size=8, action_size=4, seed=0)
+        agent = DoubleDQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=models)
         save_file = "DoubleDQNAgent_checkpoint.pth"
     elif test_DQN_PER:
         name = "DQNAgentPER"
-        agent = DQNAgentPER(state_size=8, action_size=4, seed=0)
+        agent = DQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=models)
         save_file = "DQNAgentPER_checkpoint.pth"
     elif test_double_DQN_PER:
         name = "DoubleDQNAgentPER"
-        agent = DoubleDQNAgentPER(state_size=8, action_size=4, seed=0)
+        agent = DoubleDQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=models)
         save_file = "DoubleDQNAgentPER_checkpoint.pth"
     else:
         print("Pick an agent")

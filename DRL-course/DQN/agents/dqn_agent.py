@@ -20,7 +20,7 @@ class DQNAgent:
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, state_size, action_size, seed):
+    def __init__(self, state_size, action_size, seed, models):
         """Initialize an Agent object.
         
         Params
@@ -34,8 +34,10 @@ class DQNAgent:
         self.seed = random.seed(seed)
 
         # Q-Network
-        self.qnetwork_local = QNetwork(state_size, action_size, seed).to(self.device)
-        self.qnetwork_target = QNetwork(state_size, action_size, seed).to(self.device)
+        self.qnetwork_local = models[0].to(self.device)
+        self.qnetwork_target = models[1].to(self.device)
+
+
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', factor=0.5, patience=10,
                                                               verbose=True)
@@ -128,8 +130,8 @@ class DQNAgentPER(DQNAgent):
     LR = 5e-4  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
 
-    def __init__(self, state_size, action_size, seed, continues=False):
-        super().__init__(state_size, action_size, seed)
+    def __init__(self, state_size, action_size, seed, models, continues=False):
+        super().__init__(state_size, action_size, seed, models)
         # Override replaybuffer to use priority replay
         self.memory = PrioritizedReplayBuffer(self.BUFFER_SIZE, self.BATCH_SIZE, seed, self.device)
         self.continues = continues
