@@ -8,28 +8,28 @@
 # ### 1. Import the Necessary Packages
 
 # In[ ]:
+import os
 import time
+from collections import deque
 
 import gym
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
 from agents.double_dqn_agent import DoubleDQNAgent, DoubleDQNAgentPER
 from agents.dqn_agent import DQNAgent, DQNAgentPER
-import random
-import torch
-import numpy as np
-from collections import deque
-import matplotlib.pyplot as plt
-
 from model import QNetwork, DuelingQNetwork
 
 is_ipython = 'inline' in plt.get_backend()
 if is_ipython:
-    from IPython import display
+    pass
 
 plt.ion()
 
 
-def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, max_t=1000, eps_start=1.0, eps_end=0.01,
+def dqn(agent, score_file, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, max_t=1000, eps_start=1.0,
+        eps_end=0.01,
         eps_decay=0.995):
     """Deep Q-Learning.
 
@@ -46,8 +46,9 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
     time_window = deque(maxlen=10)  # last 100 scores
     eps = eps_start  # initialize epsilon
     best_avg = 200.0
+    env.reset()
+    env.seed(0)
     for i_episode in range(1, n_episodes + 1):
-
         state = env.reset()
         score = 0
         start = time.time()
@@ -71,11 +72,13 @@ def dqn(agent, scheduler=None, save_file='checkpoint.pth', n_episodes=2000000, m
                                                                                                    np.mean(
                                                                                                        time_window)),
               end="")
+
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
                                                                                          np.mean(scores_window),
                                                                                          np.mean(time_window) * (
                                                                                                  n_episodes - i_episode)))
+            score_file.write('\tEpisode {}\tAverage Score: {:.2f}\n'.format(i_episode, np.mean(scores_window)))
         if np.mean(scores_window) >= best_avg:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode - 100,
@@ -94,87 +97,107 @@ if __name__ == '__main__':
     state_size = 8
     action_size = 4
     seed = 0
-    test_DQN_model = False
-    test_Dueling_DQN_model = True
-
+    test_DQN_model = True
+    test_Dueling_DQN_model = False
+    models = []
     if test_DQN_model:
-        models = (QNetwork(state_size=state_size, action_size=action_size, seed=seed),
-                  QNetwork(state_size=state_size, action_size=action_size, seed=seed))
-    else:
-        models = (DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed),
-                  DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed))
+        model = (QNetwork(state_size=state_size, action_size=action_size, seed=seed),
+                 QNetwork(state_size=state_size, action_size=action_size, seed=seed))
+        models.append(("QNetwork", model))
+    if test_Dueling_DQN_model:
+        model = (DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed),
+                 DuelingQNetwork(state_size=state_size, action_size=action_size, seed=seed))
+        models.append(("DuelingQNetwork", model))
 
     test_vanilla_DQN = False
     test_double_DQN = False
     test_DQN_PER = True
     test_double_DQN_PER = False
 
-    if test_vanilla_DQN:
-        name = "DQNAgent"
-        agent = DQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=models)
-        save_file = "DQNAgent_checkpoint.pth"
-    elif test_double_DQN:
-        name = "DoubleDQNAgent"
-        agent = DoubleDQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=models)
-        save_file = "DoubleDQNAgent_checkpoint.pth"
-    elif test_DQN_PER:
-        name = "DQNAgentPER"
-        agent = DQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=models)
-        save_file = "DQNAgentPER_checkpoint.pth"
-    elif test_double_DQN_PER:
-        name = "DoubleDQNAgentPER"
-        agent = DoubleDQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=models)
-        save_file = "DoubleDQNAgentPER_checkpoint.pth"
-    else:
-        print("Pick an agent")
-        stop = True
+    testing_pairs = []
+    for model_name, model in models:
+        if test_vanilla_DQN:
+            name = "Model: " + model_name + ", Agent: DQNAgent"
+            agent = DQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=model)
+            save_file = model_name + "_DQNAgent_checkpoint.pth"
+            testing_pairs.append((name, agent, save_file))
+        if test_double_DQN:
+            name = "Model: " + model_name + ", Agent: DoubleDQNAgent"
+            agent = DoubleDQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=model)
+            save_file = model_name + "_DoubleDQNAgent_checkpoint.pth"
+            testing_pairs.append((name, agent, save_file))
+        if test_DQN_PER:
+            name = "Model: " + model_name + ", Agent: DQNAgentPER"
+            agent = DQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=model)
+            save_file = model_name + "_DQNAgentPER_checkpoint.pth"
+            testing_pairs.append((name, agent, save_file))
+        if test_double_DQN_PER:
+            name = "Model: " + model_name + ", Agent: DoubleDQNAgentPER"
+            agent = DoubleDQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=model)
+            save_file = model_name + "_DoubleDQNAgentPER_checkpoint.pth"
+            testing_pairs.append((name, agent, save_file))
 
-    if not stop:
-        print("device used", agent.device)
-        test_untrained_agent = False
-        train_agent = True
+    print("device used", agent.device)
+    test_untrained_agent = False
+    train_agent = True
+    show_result = False
 
-        # watch an untrained agent
-        if test_untrained_agent:
-            state = env.reset()
-            # img = plt.imshow(env.render(mode='rgb_array'))
-            for j in range(200):
-                action = agent.act(state)
-                # img.set_data(env.render(mode='rgb_array'))
-                # plt.axis('off')
-                env.render()
-                state, reward, done, _ = env.step(action)
-                if done:
-                    break
+    # watch an untrained agent
+    if test_untrained_agent:
+        os.remove("scores_tmp.md")
+        f = open("scores_tmp.md", "a+")
+        f.write("\n## " + str("name") + "\n")
+        for i in range(10):
+            f.write(str(i))
+        f.close()
+        state = env.reset()
+        # img = plt.imshow(env.render(mode='rgb_array'))
+        for j in range(200):
+            action = agent.act(state)
+            # img.set_data(env.render(mode='rgb_array'))
+            # plt.axis('off')
+            env.render()
+            state, reward, done, _ = env.step(action)
+            if done:
+                break
 
-            env.close()
+        env.close()
 
-        if train_agent:
+    if train_agent:
+        # os.remove("scores_tmp.md")
+
+        for name, agent, save_file in testing_pairs:
+            # We open and close the filestream inside for-loop
+            # to insure we write the result even if we stop before finish
+            f = open("scores_tmp.md", "a+")
             print("train", str(name))
-            scores = dqn(agent, save_file=save_file, n_episodes=1000)
+            f.write("\n## " + str(name) + "\n")
+            scores = dqn(agent=agent, score_file=f, save_file=save_file, n_episodes=1000)
+            if show_result:
+                # plot the scores
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                plt.plot(np.arange(len(scores)), scores)
+                plt.ylabel('Score')
+                plt.xlabel('Episode #')
+                plt.show()
 
-            # plot the scores
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            plt.plot(np.arange(len(scores)), scores)
-            plt.ylabel('Score')
-            plt.xlabel('Episode #')
-            plt.show()
-            # Load best
-            agent.qnetwork_local.load_state_dict(torch.load(save_file))
+                # Load best
+                agent.qnetwork_local.load_state_dict(torch.load(save_file))
 
-            for i in range(3):
-                state = env.reset()
-                # img = plt.imshow(env.render(mode='rgb_array'))
-                for j in range(200):
-                    action = agent.act(state)
-                    # img.set_data(env.render(mode='rgb_array'))
-                    # plt.axis('off')
-                    # display.display(plt.gcf())
-                    # display.clear_output(wait=True)
-                    env.render()
-                    state, reward, done, _ = env.step(action)
-                    if done:
-                        break
+                for i in range(3):
+                    state = env.reset()
+                    # img = plt.imshow(env.render(mode='rgb_array'))
+                    for j in range(200):
+                        action = agent.act(state)
+                        # img.set_data(env.render(mode='rgb_array'))
+                        # plt.axis('off')
+                        # display.display(plt.gcf())
+                        # display.clear_output(wait=True)
+                        env.render()
+                        state, reward, done, _ = env.step(action)
+                        if done:
+                            break
 
-            env.close()
+                env.close()
+            f.close()

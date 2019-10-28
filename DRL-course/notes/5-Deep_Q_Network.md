@@ -8,7 +8,13 @@ Q-learning is a form of Temporal Difference (TD) learning
 
 For the following improvements to Deep Q-Network a more detailed description can be found here:
 
-https://www.freecodecamp.org/news/improvements-in-deep-q-learning-dueling-double-dqn-prioritized-experience-replay-and-fixed-58b130cc5682/
+* https://www.freecodecamp.org/news/improvements-in-deep-q-learning-dueling-double-dqn-prioritized-experience-replay-and-fixed-58b130cc5682/
+
+And for some implementations other than mine:
+
+* https://github.com/higgsfield/RL-Adventure
+
+I would highly recommend to try implement the solution before looking here though.
 
 ____
 
@@ -38,7 +44,7 @@ In Q-Learning, we **update a guess with a guess**, and this can potentially lead
 
 where $w^-$ are the weights of a separate target network that are not changed during the learning step, and $(S, A, R, S')$ is an experience tuple.
 
-The main idea is to use two separarete networks with identical architectures. 
+The main idea is to use two separate networks with identical architectures. 
 Lets call it target Q-Network and primary Q-Network, where the target Q-Network is updated less often to have a stable (fixed) target $\hat{q} (S',a ,w^-)$.
 
 ____
@@ -47,7 +53,30 @@ ____
 
 Deep Q-Learning [tends to overestimate](https://www.ri.cmu.edu/pub_files/pub1/thrun_sebastian_1993_1/thrun_sebastian_1993_1.pdf) action values.  [Double Q-Learning](https://arxiv.org/abs/1509.06461) has been shown to work well in practice to help with this. 
 
+To understand this problem better we look to how we compute the TD-target:
 
+<img src="images\td_target.png" style="zoom:67%;" />
+
+When computing the TD-target, we face the problem of: How are we sure that the best action for the next state is the action with the highest $Q$-value?
+
+We know that the accuracy of $Q$-values depends on what action we tried **and** what neighbouring states we explored.
+
+As a consequence, at the beginning of the training we don’t have enough information about the best action to take. Therefore, taking the maximum q value (which is noisy) as the best action to take can lead to false positives. If non-optimal actions are regularly **given a higher Q value than the optimal best action, the learning will be complicated.**
+
+
+
+**The solution is**: 
+
+when we compute the Q target, we use two networks to decouple the action selection from the target Q value generation. We:
+
+- use our DQN network to select what is the best action to take for the next state (the action with the highest Q value).
+- use our target network to calculate the target Q value of taking that action at the next state.
+
+<img src="images\td_target_double.png" style="zoom:67%;" />
+
+Therefore, Double DQN helps us reduce the overestimation of q values and, as a consequence, helps us train faster and have more stable learning.
+
+(NOTE: The implementation shows no sign of improvement "yet")
 
 ____
 
@@ -55,9 +84,67 @@ ____
 
 Deep Q-Learning samples experience transitions *uniformly* from a replay memory.  [Prioritized experienced replay](https://arxiv.org/abs/1511.05952) is based on the idea that the agent can learn more effectively from some transitions than from others, and the more important transitions should be sampled with higher probability. 
 
+Prioritized Experience Replay (PER) was introduced in 2015 by [Tom Schaul](https://arxiv.org/search?searchtype=author&query=Schaul%2C+T). The idea is that some experiences may be more important than others for our training, but might occur less frequently.
+
+Using Experience Replay we sample the batch uniformly ( selecting the experience randomly), where these rich experiences that occur rarely have practically no chance to be selected.
+
+This is why, with PER, we try to change the sampling distribution by using a criterion to define the priority of each tuple of experience.
+
+We want to take in priority **experience where there is a big difference between our prediction and the TD target, since it means that we have a lot to learn about it.**
+
+We use the absolute value of the magnitude of our TD error to compute the priority of the experience :
+$$
+p_t = |\delta_t| + e
+$$
+where $|\delta_t|$ is the magnitude of our TD error also described as $|\delta| = |Q_{\text{target}} -Q_{\text{expected}}|$. **e** is a constant to assure that no experience has 0 probability to be taken.
+
+But we can’t just do greedy prioritization, because it will lead to always training the same experiences (that have big priority), and thus over-fitting.
+
+So we introduce stochastic prioritization, **which generates the probability of being chosen for a replay.**:
+
+<img src="images/PER_priority.png" style="zoom:80%;" />
+
+As consequence, during each time step, we will get a batch of samples with this probability distribution and train our network on it.
+
+But, we still have a problem here. Remember that with normal Experience Replay, we use a stochastic update rule. As a consequence, the **way we sample the experiences must match the underlying distribution they came from.**
+
+When we do have normal experience, we select our experiences in a normal distribution — simply put, we select our experiences randomly. There is no bias, because each experience has the same chance to be taken, so we can update our weights normally.
+
+**But**, because we use priority sampling, purely random sampling is abandoned. As a consequence, we introduce bias toward high-priority samples (more chances to be selected).
+
+And, if we update our weights normally, we take have a risk of over-fitting. Samples that have high priority are likely to be used for training many times in comparison with low priority experiences (= bias). As a consequence, we’ll update our weights with only a small portion of experiences that we consider to be really interesting.
+
+To correct this bias, we use importance sampling weights (IS) that will adjust the updating by reducing the weights of the often seen samples.
+
+<img src="images/PER_weights.png" style="zoom:80%;" />
+
+The weights corresponding to high-priority samples have very little adjustment (because the network will see these experiences many times), whereas those corresponding to low-priority samples will have a full update.
+
+The role of **b** is to control how much these importance sampling weights affect learning. In practice, the b parameter is annealed up to 1 over the duration of training, because these weights are more important **in the end of learning when our q values begin to converge.** The unbiased nature of updates is most important near convergence, as explained in this [article](http://pemami4911.github.io/paper-summaries/deep-rl/2016/01/26/prioritizing-experience-replay.html).
 
 
-Implementation: https://github.com/Ullar-Kask/TD3-PER/tree/master/Pytorch/src
+
+#### 5.1 Implementing PER
+
+This time, the implementation will be a little bit fancier.
+
+First of all, we can’t just implement PER by sorting all the Experience Replay Buffers according to their priorities. This will not be efficient at all due to **O(nlogn) for insertion and O(n) for sampling.**
+
+As explained in[ this really good article](https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/), we need to use another data structure instead of sorting an array — an unsorted **sumtree.**
+
+A sumtree is a Binary Tree, that is a tree with only a maximum of two children for each node. The leaves (deepest nodes) contain the priority values, and a data array that points to leaves contains the experiences.
+
+Updating the tree and sampling will be really efficient $O(log n)$.
+
+<img src="images/PER_sumtree.png" style="zoom:80%;" />
+
+Then, we create a memory object that will contain our sumtree and data.
+
+Next, to sample a minibatch of size k, the range [0, total_priority] will be divided into k ranges. A value is uniformly sampled from each range.
+
+Finally, the transitions (experiences) that correspond to each of these sampled values are retrieved from the sumtree.
+
+Implementation other than mine: https://github.com/Ullar-Kask/TD3-PER/tree/master/Pytorch/src
 
 ____
 
@@ -65,13 +152,73 @@ ____
 
 Currently, in order to determine which states are (or are not) valuable, we have to estimate the corresponding action values *for each action*.  However, by replacing the traditional Deep Q-Network (DQN) architecture with a [dueling architecture](https://arxiv.org/abs/1511.06581), we can assess the value of each state, without having to learn the effect of each action.
 
+so remember that Q-values correspond **to how good it is to be at that state and taking an action at that state Q(s,a).**
+
+So we can decompose Q(s,a) as the sum of:
+
+- **V(s)**: the value of being at that state
+- **A(s,a)**: the advantage of taking that action at that state (how much better is to take this action versus all other possible actions at that state).
+
+$$
+Q(s,a) = V(s) + A(s,a)
+$$
+
+With DDQN, we can to separate the estimator of these two elements, using two new streams:
+
+- one that estimates the **state value V(s)**
+- one that estimates the **advantage for each action A(s,a)**
+
+![)](images/dueling_model.png)
+
+And then we combine these two streams **through a special aggregation layer to get an estimate of Q(s,a).**
+$$
+\text{Aggregation layer:  } Q(s,a) = \text{value} + (\text{advantage} - mean(\text{advantage}))
+$$
+
+
+Wait? **But why do we need to calculate these two elements separately if then we combine them?**
+
+By decoupling the estimation, intuitively our DDQN can learn which states are valuable without learning the effect of each action in that state. Look at it this way, if the value in the state is so bad that it really doesn't matter what action we take it will still be a bad state to be in.
+
+With our normal DQN, we need to calculate the value of each action at that state. **But what’s the point if the value of the state is bad?** What’s the point to calculate all actions at one state when all these actions lead to death?
+
+As a consequence, by decoupling we’re able to calculate V(s). This is particularly **useful for states where their actions do not affect the environment in a relevant way.** In this case, it’s unnecessary to calculate the value of each action. For instance, moving right or left only matters if there is a risk of collision. And, in most states, the choice of action has no effect on what happens.
+
+This architecture helps us accelerate the training. We can calculate the value of a state without calculating the Q(s,a) for each action at that state. And it can help us find much more reliable Q values for each action by decoupling the estimation between two streams.
+
+(NOTE: The implementation shows no sign of improvement "yet")
+
+____
+
+#### 7. Rainbow
+
+So far, you've learned about three extensions to the Deep Q-Networks (DQN) algorithm:
+
+- Double DQN (DDQN)
+- Prioritized experience replay 
+- Dueling DQN 
+
+But these aren't the only extensions to the DQN algorithm!  Many more extensions have been proposed, including:
+
+- Learning from [multi-step bootstrap targets](https://arxiv.org/abs/1602.01783) (as in A3C - *you'll learn about this in the next part of the nanodegree*)
+- [Distributional DQN](https://arxiv.org/abs/1707.06887)
+- [Noisy DQN](https://arxiv.org/abs/1706.10295)
+
+Each of the six extensions address a **different** issue with the original DQN algorithm.
+
+Researchers at Google DeepMind recently tested the performance of an  agent that incorporated all six of these modifications.  The  corresponding algorithm was termed [Rainbow](https://arxiv.org/abs/1710.02298).
+
+It outperforms each of the individual modifications and achieves state-of-the-art performance on Atari 2600 games!
+
+<img src="images/DQN_comparisons.png" style="zoom: 50%;" />
+
 
 
 ____
 
-#### 7. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
+#### 8. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
 
-**7.1 Agent - Functionality**
+**8.1 Agent - Functionality**
 
 How we initialize the agent, this can of cause be done in sooo many ways, but here is an example:
 
@@ -141,7 +288,7 @@ def act(self, state, eps=0.):
 
 
 
-**7.2 Agent - Update network**
+**8.2 Agent - Update network**
 
 Here we see an example on how we can update the network from a batch of experience.
 
@@ -209,7 +356,7 @@ def soft_update(self, local_model, target_model, tau):
 
 
 
-**7.3 Experience Replay**
+**8.3 Experience Replay**
 
 This is an implementation of the Experience Replay, we call it the replay buffer.
 
@@ -274,7 +421,7 @@ class ReplayBuffer:
         return len(self.memory)
 ~~~~
 
-**7.5 Main function**
+**8.5 Main function**
 
 ```python
 def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
