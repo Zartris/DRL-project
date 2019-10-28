@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from experience_replay import ReplayBuffer, PrioritizedReplayBuffer
-from model import QNetwork
 
 
 class DQNAgent:
@@ -15,7 +14,7 @@ class DQNAgent:
     BATCH_SIZE = 64  # minibatch size
     GAMMA = 0.99  # discount factor
     TAU = 1e-3  # for soft update of target parameters
-    LR = 5e-4  # learning rate
+    LR = 0.001  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -37,10 +36,7 @@ class DQNAgent:
         self.qnetwork_local = models[0].to(self.device)
         self.qnetwork_target = models[1].to(self.device)
 
-
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=self.LR)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', factor=0.5, patience=10,
-                                                              verbose=True)
 
         # Replay memory
         self.memory = ReplayBuffer(action_size, self.BUFFER_SIZE, self.BATCH_SIZE, seed, self.device)
