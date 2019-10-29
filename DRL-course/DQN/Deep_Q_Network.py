@@ -46,8 +46,7 @@ def dqn(agent, score_file, scheduler=None, save_file='checkpoint.pth', n_episode
     time_window = deque(maxlen=10)  # last 100 scores
     eps = eps_start  # initialize epsilon
     best_avg = 200.0
-    env.reset()
-    env.seed(0)
+
     for i_episode in range(1, n_episodes + 1):
         state = env.reset()
         score = 0
@@ -97,8 +96,8 @@ if __name__ == '__main__':
     state_size = 8
     action_size = 4
     seed = 0
-    test_DQN_model = True
-    test_Dueling_DQN_model = False
+    test_DQN_model = False
+    test_Dueling_DQN_model = True
     models = []
     if test_DQN_model:
         model = (QNetwork(state_size=state_size, action_size=action_size, seed=seed),
@@ -112,7 +111,7 @@ if __name__ == '__main__':
     test_vanilla_DQN = False
     test_double_DQN = False
     test_DQN_PER = True
-    test_double_DQN_PER = False
+    test_double_DQN_PER = True
 
     testing_pairs = []
     for model_name, model in models:
