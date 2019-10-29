@@ -30,7 +30,11 @@ class DQNAgent:
         """
         self.state_size = state_size
         self.action_size = action_size
-        self.seed = random.seed(seed)
+        # seeding
+        self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
 
         # Q-Network
         self.qnetwork_local = models[0].to(self.device)

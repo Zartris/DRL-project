@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class QNetwork(nn.Module):
@@ -26,10 +25,16 @@ class QNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, self.action_size)
         )
+        self.model.apply(self.init_weights)
 
     def forward(self, state):
         """Build a network that maps state -> action values."""
         return self.model(state)
+
+    def init_weights(self, m):
+        if type(m) == nn.Linear:
+            torch.nn.init.xavier_uniform_(m.weight)
+            m.bias.data.fill_(0.01)
 
 
 class DuelingQNetwork(nn.Module):
@@ -47,33 +52,44 @@ class DuelingQNetwork(nn.Module):
         self.seed = torch.manual_seed(seed)
         self.state_size = state_size
         self.action_size = action_size
-        self.fc1 = nn.Sequential(
-            nn.Linear(state_size, 512),
+        self.feature_layer = nn.Sequential(
+            nn.Linear(self.state_size, 128),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Linear(128, 512),
             nn.ReLU()
         )
 
-        # We create two separate streams (both ends with no activation function)
-        # One for computing the value function V(s)
-        self.value_fc1 = nn.Linear(512, 256)
-        self.value_fc2 = nn.Linear(256, 1)
+        self.value_stream = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
+        )
 
-        # The one that calculate A(s,a)
-        self.advantage_fc1 = nn.Linear(512, 256)
-        self.advantage_fc2 = nn.Linear(256, self.action_size)
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, self.action_size)
+        )
+        # Init weights:
+        self.feature_layer.apply(self.init_weights)
+        self.value_stream.apply(self.init_weights)
+        self.advantage_stream.apply(self.init_weights)
+
 
     def forward(self, state):
         """Build a network that maps state -> action values."""
-        x = self.fc1(state)
+        x = self.feature_layer(state)
         # Compute the value function
-        value = F.relu(self.value_fc1(x))
-        value = self.value_fc2(value)
+        value = self.value_stream(x)
 
         # compute the advantage
-        advantage = F.relu(self.advantage_fc1(x))
-        advantage = self.advantage_fc2(advantage)
-
+        advantage = self.advantage_stream(x)
         # Compute Q-value:
-        q = value.expand_as(advantage) + (advantage - advantage.mean(1, keepdim=True).expand_as(advantage))
-        return q
+        q_values = value.expand_as(advantage) + (advantage - advantage.mean(1, keepdim=True).expand_as(advantage))
+        return q_values
+
+    @staticmethod
+    def init_weights(m):
+        if type(m) == nn.Linear:
+            torch.nn.init.xavier_uniform_(m.weight)
+            m.bias.data.fill_(0.01)

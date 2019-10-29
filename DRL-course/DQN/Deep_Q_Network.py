@@ -46,7 +46,7 @@ def dqn(agent, score_file, scheduler=None, save_file='checkpoint.pth', n_episode
     time_window = deque(maxlen=10)  # last 100 scores
     eps = eps_start  # initialize epsilon
     best_avg = 200.0
-
+    env.seed(seed)
     for i_episode in range(1, n_episodes + 1):
         state = env.reset()
         score = 0
@@ -88,14 +88,16 @@ def dqn(agent, score_file, scheduler=None, save_file='checkpoint.pth', n_episode
 
 
 if __name__ == '__main__':
+    base_dir = "checkpoints/"
     stop = False
+    seed = 0
     env = gym.make('LunarLander-v2')
-    env.seed(0)
+
     print('State shape: ', env.observation_space.shape)
     print('Number of actions: ', env.action_space.n)
-    state_size = 8
-    action_size = 4
-    seed = 0
+    state_size = env.observation_space.shape[0]
+    action_size = env.action_space.n
+
     test_DQN_model = False
     test_Dueling_DQN_model = True
     models = []
@@ -110,36 +112,38 @@ if __name__ == '__main__':
 
     test_vanilla_DQN = False
     test_double_DQN = False
-    test_DQN_PER = True
+    test_DQN_PER = False
     test_double_DQN_PER = True
+    assert test_vanilla_DQN or test_double_DQN or test_DQN_PER or test_double_DQN_PER
 
     testing_pairs = []
     for model_name, model in models:
         if test_vanilla_DQN:
             name = "Model: " + model_name + ", Agent: DQNAgent"
             agent = DQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=model)
-            save_file = model_name + "_DQNAgent_checkpoint.pth"
+            save_file = base_dir + model_name + "_DQNAgent_checkpoint.pth"
             testing_pairs.append((name, agent, save_file))
         if test_double_DQN:
             name = "Model: " + model_name + ", Agent: DoubleDQNAgent"
             agent = DoubleDQNAgent(state_size=state_size, action_size=action_size, seed=seed, models=model)
-            save_file = model_name + "_DoubleDQNAgent_checkpoint.pth"
+            save_file = base_dir + model_name + "_DoubleDQNAgent_checkpoint.pth"
             testing_pairs.append((name, agent, save_file))
         if test_DQN_PER:
             name = "Model: " + model_name + ", Agent: DQNAgentPER"
             agent = DQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=model)
-            save_file = model_name + "_DQNAgentPER_checkpoint.pth"
+            save_file = base_dir + model_name + "_DQNAgentPER_checkpoint.pth"
             testing_pairs.append((name, agent, save_file))
         if test_double_DQN_PER:
             name = "Model: " + model_name + ", Agent: DoubleDQNAgentPER"
             agent = DoubleDQNAgentPER(state_size=state_size, action_size=action_size, seed=seed, models=model)
-            save_file = model_name + "_DoubleDQNAgentPER_checkpoint.pth"
+            save_file = base_dir + model_name + "_DoubleDQNAgentPER_checkpoint.pth"
             testing_pairs.append((name, agent, save_file))
 
     print("device used", agent.device)
     test_untrained_agent = False
     train_agent = True
     show_result = False
+    assert test_untrained_agent or train_agent
 
     # watch an untrained agent
     if test_untrained_agent:

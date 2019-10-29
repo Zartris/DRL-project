@@ -60,3 +60,27 @@
 	Episode 800	Average Score: 224.71
 	Episode 900	Average Score: 231.02
 	Episode 1000	Average Score: 253.34
+
+## Model: DuelingQNetwork, Agent: DoubleDQNAgent
+	Episode 100	Average Score: -181.45
+	Episode 200	Average Score: -141.45
+	Episode 300	Average Score: -119.65
+	Episode 400	Average Score: -91.07
+	Episode 500	Average Score: -54.62
+	Episode 600	Average Score: 22.10
+	Episode 700	Average Score: 69.36
+	Episode 800	Average Score: 41.53
+	Episode 900	Average Score: -22.92
+	Episode 1000	Average Score: -99.23
+
+## Model: DuelingQNetwork, Agent: DQNAgentPER
+	Episode 100	Average Score: -156.31
+	Episode 200	Average Score: -86.22
+	Episode 300	Average Score: -23.67
+	Episode 400	Average Score: 115.48
+	Episode 500	Average Score: 194.57
+	Episode 600	Average Score: 210.54
+	Episode 700	Average Score: 227.02
+	Episode 800	Average Score: 226.47
+	Episode 900	Average Score: 195.48
+	Episode 1000	Average Score: 93.62

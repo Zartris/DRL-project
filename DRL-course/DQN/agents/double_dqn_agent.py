@@ -54,9 +54,9 @@ class DoubleDQNAgent(DQNAgent):
 class DoubleDQNAgentPER(DQNAgent):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     BUFFER_SIZE = (2 ** 20)  # replay buffer size
-    BATCH_SIZE = 64  # minibatch size
+    BATCH_SIZE = 32  # minibatch size
     GAMMA = 0.99  # discount factor
-    TAU = 1e-3  # for soft update of target parameters
+    TAU = 1e-4  # for soft update of target parameters
 
     LR = 5e-4  # learning rate
     UPDATE_EVERY = 4  # how often to update the network
@@ -69,7 +69,7 @@ class DoubleDQNAgentPER(DQNAgent):
 
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
-        error = reward
+        error = None
         self.memory.add((state, action, reward, next_state, done), error)
 
         # Learn every UPDATE_EVERY time steps.
@@ -100,7 +100,6 @@ class DoubleDQNAgentPER(DQNAgent):
 
         is_weights = torch.from_numpy(is_weights).float().to(self.device)
 
-        "*** YOUR CODE HERE ***"
         # Getting the max action of local network (using weights w)
         max_actions_Snext_local = self.qnetwork_local(next_states).detach().max(1)[1].unsqueeze(1)
 
@@ -113,7 +112,7 @@ class DoubleDQNAgentPER(DQNAgent):
         # Get expected Q values from local model
         Q_expected = self.qnetwork_local(states).gather(1, actions)
 
-        errors = np.abs((Q_expected - Q_targets).detach().cpu().numpy())
+        errors = torch.abs(Q_expected - Q_targets).detach().cpu()
         self.memory.batch_update(idxs, errors)
 
         # Compute loss

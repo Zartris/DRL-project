@@ -25,7 +25,10 @@ class ReplayBuffer:
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.seed = random.seed(seed)
+        self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
         self.device = device
 
     def add(self, state, action, reward, next_state, done):
@@ -55,9 +58,9 @@ class ReplayBuffer:
 # MODIFIED TO USE PRIORITY
 class PrioritizedReplayBuffer:
     """Fixed-size buffer to store experience tuples. https://github.com/simoninithomas/Deep_reinforcement_learning_Course/blob/master/Dueling%20Double%20DQN%20with%20PER%20and%20fixed-q%20targets/Dueling%20Deep%20Q%20Learning%20with%20Doom%20(%2B%20double%20DQNs%20and%20Prioritized%20Experience%20Replay).ipynb"""
-    absolute_error_upper = 3.  # clipped abs error
+    absolute_error_upper = 1.  # clipped abs error
 
-    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.001, alpha=0.6, beta=0.4, beta_increase=1e-2):
+    def __init__(self, buffer_size, batch_size, seed, device, epsilon=0.001, alpha=0.6, beta=0.4, beta_increase=5e-3):
         """Initialize a ReplayBuffer object.
 
         Params
@@ -70,11 +73,13 @@ class PrioritizedReplayBuffer:
             alpha (float): [0..1] convert the importance of TD error to priority, often 0.6
             epsilon (float): small amount to avoid zero priority
         """
-
+        self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
         self.memory_tree = SumTree(buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.seed = random.seed(seed)
         self.device = device
 
         self.beta = beta
