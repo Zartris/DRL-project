@@ -42,5 +42,5 @@ class PrioritizedReplayBuffer:
 
 class SumTree:
     def __init__(self, capacity):
-        
+
         debug = 0
