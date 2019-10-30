@@ -98,8 +98,8 @@ if __name__ == '__main__':
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
-    test_DQN_model = False
-    test_Dueling_DQN_model = True
+    test_DQN_model = True
+    test_Dueling_DQN_model = False
     models = []
     if test_DQN_model:
         model = (QNetwork(state_size=state_size, action_size=action_size, seed=seed),
@@ -111,9 +111,9 @@ if __name__ == '__main__':
         models.append(("DuelingQNetwork", model))
 
     test_vanilla_DQN = False
-    test_double_DQN = False
+    test_double_DQN = True
     test_DQN_PER = False
-    test_double_DQN_PER = True
+    test_double_DQN_PER = False
     assert test_vanilla_DQN or test_double_DQN or test_DQN_PER or test_double_DQN_PER
 
     testing_pairs = []
@@ -175,7 +175,7 @@ if __name__ == '__main__':
             f = open("scores_tmp.md", "a+")
             print("train", str(name))
             f.write("\n## " + str(name) + "\n")
-            scores = dqn(agent=agent, score_file=f, save_file=save_file, n_episodes=1000)
+            scores = dqn(agent=agent, score_file=f, save_file=save_file, n_episodes=200)
             if show_result:
                 # plot the scores
                 fig = plt.figure()

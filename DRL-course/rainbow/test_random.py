@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 
@@ -8,9 +9,12 @@ class Test:
 
     def run_test(self):
         l = []
+        l2 = []
         for i in range(10):
             l.append(np.random.random())
+            l2.append(random.random())
         print(l)
+        print(l2)
 
 
 if __name__ == '__main__':

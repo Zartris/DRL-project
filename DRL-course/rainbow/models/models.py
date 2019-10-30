@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class QNetwork(nn.Module):
@@ -16,6 +16,7 @@ class QNetwork(nn.Module):
         super(QNetwork, self).__init__()
         self.seed = seed
         torch.manual_seed(self.seed)
+
         self.state_size = state_size
         self.action_size = action_size
 
@@ -26,6 +27,7 @@ class QNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, self.action_size)
         )
+
         self.model.apply(self.init_weights)
 
     def forward(self, state):
@@ -38,25 +40,16 @@ class QNetwork(nn.Module):
             m.bias.data.fill_(0.01)
 
 
-class DuelingQNetwork(nn.Module):
-    """Actor (Policy) Model."""
-
-    def __init__(self, state_size, action_size, seed):
-        """Initialize parameters and build model.
-        Params
-        ======
-            state_size (int): Dimension of each state
-            action_size (int): Dimension of each action
-            seed (int): Random seed
-        """
-        super(DuelingQNetwork, self).__init__()
-        self.seed = torch.manual_seed(seed)
-        self.state_size = state_size
+# # Dueling Deep Q-Network (DDQN)
+class DDQN(nn.Module):
+    def __init__(self, state_size, action_size, seed=0):
+        super(DDQN, self).__init__()
+        torch.manual_seed(seed)
         self.action_size = action_size
+        self.state_size = state_size
+
         self.feature_layer = nn.Sequential(
-            nn.Linear(self.state_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, 512),
+            nn.Linear(self.state_size, 512),
             nn.ReLU()
         )
 
@@ -71,22 +64,17 @@ class DuelingQNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, self.action_size)
         )
-        # Init weights:
+
         self.feature_layer.apply(self.init_weights)
         self.value_stream.apply(self.init_weights)
         self.advantage_stream.apply(self.init_weights)
 
-
     def forward(self, state):
-        """Build a network that maps state -> action values."""
         x = self.feature_layer(state)
-        # Compute the value function
         value = self.value_stream(x)
-
-        # compute the advantage
         advantage = self.advantage_stream(x)
-        # Compute Q-value:
-        q_values = value.expand_as(advantage) + (advantage - advantage.mean(1, keepdim=True).expand_as(advantage))
+        q_values = value.expand_as(advantage) + (
+                advantage - advantage.mean(dim=state.dim() - 1, keepdim=True).expand_as(advantage))
         return q_values
 
     @staticmethod

@@ -12,3 +12,11 @@
 	Episode 800	Average Score: 54.06
 	Episode 900	Average Score: -79.14
 	Episode 1000	Average Score: -130.03
+
+## Model: QNetwork, Agent: DoubleDQNAgent
+	Episode 100	Average Score: -157.25
+	Episode 200	Average Score: -108.63
+
+## Model: QNetwork, Agent: DoubleDQNAgent
+	Episode 100	Average Score: -169.41
+	Episode 200	Average Score: -133.34

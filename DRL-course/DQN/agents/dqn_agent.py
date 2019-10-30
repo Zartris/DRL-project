@@ -73,10 +73,10 @@ class DQNAgent:
         self.qnetwork_local.train()
 
         # Epsilon-greedy action selection
-        if random.random() > eps:
+        if np.random.random() > eps:
             return np.argmax(action_values.cpu().data.numpy())
         else:
-            return random.choice(np.arange(self.action_size))
+            return np.random.choice(np.arange(self.action_size))
 
     def learn(self, gamma):
         """Update value parameters using given batch of experience tuples.
