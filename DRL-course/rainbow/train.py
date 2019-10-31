@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from agents.rainbow_agent import RainbowAgent
-from models.models import DDQN
+from rainbow.agents.rainbow_agent import RainbowAgent
+from rainbow.models.models import DDQN
 
 
 def create_train_info(name, episodes, max_t, eps_start, eps_end, eps_decay):
@@ -188,10 +188,9 @@ if __name__ == '__main__':
     general_info = create_general_info("*general info:*", game, seed, state_size, action_size)
 
     # Agent Hyperparameters
-
     continues = False
-    BUFFER_SIZE = (2 ** 20)
-    BATCH_SIZE = 128
+    BUFFER_SIZE = (2 ** 14)
+    BATCH_SIZE = 64
     GAMMA = 0.99
     TAU = 1e-4
     LR = 0.001
@@ -208,11 +207,11 @@ if __name__ == '__main__':
     PER_a = .6
     PER_b = .4
     PER_bi = 0.001
-    PER_aeu = 1
+    PER_aeu = 2
     per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
 
     # Training
-    episodes = 200
+    episodes = 400
     max_t = 1000
     eps_start = 1.0
     eps_end = 0.01
