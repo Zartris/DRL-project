@@ -4,7 +4,7 @@
 
 Q-learning is a form of Temporal Difference (TD) learning
 
-
+https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Getting-Started-with-Balance-Ball.md
 
 For the following improvements to Deep Q-Network a more detailed description can be found here:
 
