@@ -42,3 +42,7 @@
 	Episode 100	Average Score: -177.75
 	Episode 200	Average Score: -79.96
 	Episode 300	Average Score: -93.97
+	Episode 400	Average Score: -87.09
+
+
+best score: 208.91872270791353 at eps: 335
