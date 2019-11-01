@@ -11,7 +11,7 @@ class RainbowAgent:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def __init__(self,
-                 state_size, action_size, models, seed, continues=False,
+                 state_size, action_size, models, use_noise, seed, continues=False,
                  BUFFER_SIZE=(2 ** 20), BATCH_SIZE=64, GAMMA=0.99, TAU=1e-3, LR=5e-4, UPDATE_MODEL_EVERY=4,
                  UPDATE_TARGET_EVERY=1000, use_soft_update=False, priority_method="reward", per=True,
                  PER_e=0.01, PER_a=.6, PER_b=.4, PER_bi=0.001, PER_aeu=3
@@ -36,6 +36,7 @@ class RainbowAgent:
         self.t_step = 0
 
         # Double DQN or QN:
+        self.use_noise = use_noise
         self.model = models[0].to(self.device)
         self.model_target = models[1].to(self.device)
         self.continues = continues
@@ -48,6 +49,9 @@ class RainbowAgent:
                                                   beta_increase=PER_bi, absolute_error_upper=PER_aeu)
         else:
             self.memory = ReplayBuffer(self.action_size, self.buffer_size, self.batch_size, self.seed, self.device)
+
+        #plotting:
+        self.losses = []
 
     def step(self, state, action, reward, next_state, done):
         """Saves learning experience in memory tree and decides if it is time to update models.
@@ -80,7 +84,8 @@ class RainbowAgent:
         if self.t_step % self.UPDATE_MODEL_EVERY == 0:
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > self.batch_size:
-                self.learn()
+                loss = self.learn()
+                self.losses.append(loss)
                 if self.use_soft_update:
                     self.soft_update(self.model, self.model_target, self.tau)
 
@@ -98,12 +103,11 @@ class RainbowAgent:
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         self.model.eval()
         with torch.no_grad():
-            action_values = self.model(state)
+            action_values = self.model.forward(state)
         self.model.train()
-
         # Epsilon-greedy action selection
-        if np.random.random() > eps:
-            return np.argmax(action_values.cpu().data.numpy())
+        if np.random.random() > eps or self.use_noise:
+            return np.argmax(action_values.detach().cpu().numpy())
         else:
             return np.random.choice(np.arange(self.action_size))
 
@@ -136,10 +140,10 @@ class RainbowAgent:
             states, actions, rewards, next_states, dones = experiences
 
         # Getting the max action of local network (using weights w)
-        max_actions = self.model(next_states).detach().max(1)[1].unsqueeze(1)
+        max_actions = self.model.forward(next_states).detach().max(1)[1].unsqueeze(1)
 
         # Getting the Q-value for these actions (using weight w^-)
-        Q_targets_next = self.model_target(next_states).detach().gather(1, max_actions)
+        Q_targets_next = self.model_target.forward(next_states).detach().gather(1, max_actions)
 
         # Compute Q targets for current states (TD-target)
         Q_targets = rewards + (self.gamma * Q_targets_next * (1 - dones))
@@ -159,6 +163,8 @@ class RainbowAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        # todo::Consider resetting noise here
+        return loss.item()
 
     def compute_error(self, state, action, reward, next_state, done):
         self.model.eval()

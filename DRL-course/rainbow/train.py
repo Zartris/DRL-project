@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from rainbow.agents.rainbow_agent import RainbowAgent
-from rainbow.models.models import DDQN
+from rainbow.models.models import DDQN, NoisyDDQN
 
 
 def create_train_info(name, episodes, max_t, eps_start, eps_end, eps_decay):
@@ -65,7 +65,7 @@ def movingaverage(values, window, mode='same'):
     return sma.tolist()
 
 
-def show_plot(scores, Ln_blue, Ln_olive):
+def plot_score(scores, Ln_blue, Ln_olive):
     # print("plot:")
     mean_scores = []
     for i in range(0, len(scores), 5):
@@ -101,11 +101,19 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
         min_score = -200
         max_score = min_score + 10
         fig = plt.figure()
-        ax = fig.add_subplot(111)
-        Ln_blue, = ax.plot([0, 0])
-        Ln_olive, = ax.plot([0, 0], color='olive')
-        ax.set_ylim([min_score, max_score])
-        ax.set_xlim([0, 1])
+        # fig, axs = plt.subplots(2, 1)
+        # score_ax = axs[0]
+        score_ax = fig.add_subplot(111)
+        score_line_blue, = score_ax.plot([0, 0])
+        score_line_olive, = score_ax.plot([0, 0], color='olive')
+        score_ax.set_ylim([min_score, max_score])
+        score_ax.set_xlim([0, 1])
+
+        # loss_ax = axs[1]
+        # loss_line_blue, = loss_ax.plot([0, 0])
+        # loss_ax.set_ylim([0, 10])
+        # loss_ax.set_xlim([0, 1])
+
         plt.title(plot_title)
         plt.xlabel('epoch')
         plt.ylabel('score mean over 5 epoch')
@@ -135,25 +143,36 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
         if scheduler is not None:
             scheduler.step(np.mean(scores_window), i_episode)
-        print('\rEpisode {}\tAverage Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(i_episode,
-                                                                                                   np.mean(
-                                                                                                       scores_window),
-                                                                                                   np.mean(
-                                                                                                       time_window)),
+        print('\rEpisode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
+            i_episode,
+            np.mean(
+                scores_window),
+            score,
+            np.mean(
+                time_window)),
               end="")
         if plot and i_episode % 5 == 0:
             # update plot
+            # losses = agent.losses
+
+            # loss
+            # update_loss_axis(losses, i_episode, loss_ax)
+            # plot_loss(loss_line_blue, losses)
+
+            # score
+            # Update axis:
             window = scores[-5:]
             mean = np.mean(window)
             if mean > max_score - buffer:
                 max_score = mean + buffer
-                ax.set_ylim([min_score, max_score])
+                score_ax.set_ylim([min_score, max_score])
             if mean < min_score + buffer:
                 min_score = mean - buffer
-                ax.set_ylim([min_score, max_score])
-            ax.set_xlim([0, len(scores)])
-            # threading.Thread(target=show_plot, args=(scores, Ln)).start()
-            show_plot(scores, Ln_blue, Ln_olive)
+                score_ax.set_ylim([min_score, max_score])
+            score_ax.set_xlim([0, len(scores)])
+            # PLOT
+            plot_score(scores, score_line_blue, score_line_olive)
+
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
                                                                                          np.mean(scores_window),
@@ -175,7 +194,24 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
     return scores, best_avg
 
 
+def plot_loss(loss_line_blue, losses):
+    if len(losses) >= 5:
+        yMA = movingaverage(losses, 5)
+        loss_line_blue.set_ydata(yMA)
+        loss_line_blue.set_xdata(range(0, len(losses)))
+
+
+def update_loss_axis(losses, i_episode, loss_ax):
+    loss_ax.set_ylim([np.argmin(losses) - 10, np.argmax(losses) + 10])
+    loss_ax.set_xlim([0, len(losses)])
+
+
 if __name__ == '__main__':
+    # Notes for next run:
+    """
+    Change learning rate back and try to increase PER_aeu to 100 or just very high
+    """
+
     game = "LunarLander-v2"
     env = gym.make(game)
     # Hyperparameters
@@ -193,7 +229,7 @@ if __name__ == '__main__':
     BATCH_SIZE = 64
     GAMMA = 0.99
     TAU = 1e-4
-    LR = 0.001
+    LR = 0.005
     UPDATE_MODEL_EVERY = 4
     UPDATE_TARGET_EVERY = 1000
     use_soft_update = False
@@ -230,10 +266,14 @@ if __name__ == '__main__':
     save_image = str(Path(base_dir, "plot.png"))
 
     plot = True
-    model = DDQN
+    model = NoisyDDQN
+    use_noise = False
     title = "model: "
     if model == DDQN:
         title += "Dueling, "
+    elif model == NoisyDDQN:
+        title += "NoisyDueling, "
+        use_noise = True
     else:
         title += "Normal, "
 
@@ -257,7 +297,7 @@ if __name__ == '__main__':
         f.write(train_info + "\n\n")
         f.write("\n## Test data: \n\n")
     models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
-    agent = RainbowAgent(state_size, action_size, models, seed,
+    agent = RainbowAgent(state_size, action_size, models, use_noise=use_noise, seed=seed,
                          continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                          LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
                          use_soft_update=use_soft_update, priority_method=priority_method,

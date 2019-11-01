@@ -202,7 +202,7 @@ But these aren't the only extensions to the DQN algorithm!  Many more extensions
 
 - Learning from [multi-step bootstrap targets](https://arxiv.org/abs/1602.01783) (as in A3C - *you'll learn about this in the next part of the nanodegree*)
 - [Distributional DQN](https://arxiv.org/abs/1707.06887)
-- [Noisy DQN](https://arxiv.org/abs/1706.10295)
+- [Noisy DQN](https://arxiv.org/abs/1706.10295) 
 
 Each of the six extensions address a **different** issue with the original DQN algorithm.
 
@@ -212,13 +212,164 @@ It outperforms each of the individual modifications and achieves state-of-the-ar
 
 <img src="images/DQN_comparisons.png" style="zoom: 50%;" />
 
+____
+
+#### 8. Noisy DQN
+
+Noisy DQN adds some parametric noise to the weights which is shown to aid efficient explorations.
+
+implementation wise - we are changing from a $\epsilon$-greedy approach to instead let the policy greedily optimises the (randomised) action-value function. 
+
+~~~~python
+def act(self, state, eps=0):
+    """Returns actions for given state as per current policy.
+
+    Params
+    ======
+    	state (array_like): current state
+		eps (float): epsilon, for epsilon-greedy action selection
+    """
+   	# Unwrap state and send it to device
+    state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+    self.model.eval()
+    with torch.no_grad():
+        action_values = self.model.forward(state)
+	self.model.train()
+    # Policy-greedily action selection 
+    #(Take the best action, the noise takes care of exploration)
+   	return np.argmax(action_values.detach().cpu().numpy())
+
+~~~~
+
+Then we have to introduce noise to the model weights:
+
+Fist we create a linear noise layer
+
+~~~~python
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class FactorizedNoisyLinear(nn.Module):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    def __init__(self, in_features, out_features, seed, is_training=True, std_init=0.5):
+        super(FactorizedNoisyLinear, self).__init__()
+        # seeding to test hyperparameter optimization
+        self.seed = seed
+        torch.manual_seed(self.seed)
+		# Size of input and output
+        self.in_features = in_features
+        self.out_features = out_features
+        # Create state where noise is not applied
+        self.is_training = is_training
+		
+        self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.weight_sigma = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.register_buffer("weight_epsilon", torch.Tensor(out_features, in_features))
+
+        self.bias_mu = nn.Parameter(torch.Tensor(out_features))
+        self.bias_sigma = nn.Parameter(torch.Tensor(out_features))
+        self.register_buffer("bias_epsilon", torch.Tensor(out_features))
+
+        self.std_init = std_init
+
+        self.reset_parameters()
+        self.reset_noise()
+
+    def forward(self, x):
+        self.reset_noise()
+
+        if self.is_training:
+            weight = self.weight_mu + self.weight_sigma * self.weight_epsilon
+            bias = self.bias_mu + self.bias_sigma * self.bias_epsilon
+        else:
+            weight = self.weight_mu
+            bias = self.bias_mu
+
+        y = F.linear(x, weight, bias)
+
+        return y
+
+    def reset_parameters(self):
+        std = 1 / math.sqrt(self.in_features)
+        self.weight_mu.data.uniform_(-std, std)
+        self.weight_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
+
+        self.bias_mu.data.uniform_(-std, std)
+        self.bias_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
+
+    def reset_noise(self):
+        epsilon_in = self._scale_noise(self.in_features)
+        epsilon_out = self._scale_noise(self.out_features)
+        self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
+        self.bias_epsilon.copy_(epsilon_out)
+
+    def _scale_noise(self, size):
+        x = torch.randn(size)
+        return x.sign().mul_(x.abs().sqrt_())
+~~~~
+
+
+
+We can now expand our model with this layer:
+
+~~~~Python
+class NoisyDDQN(nn.Module):
+    def __init__(self, state_size, action_size, seed=0):
+        super(NoisyDDQN, self).__init__()
+        torch.manual_seed(seed)
+        self.action_size = action_size
+        self.state_size = state_size
+
+        self.feature_layer = nn.Sequential(
+            FactorizedNoisyLinear(self.state_size, 512, seed),
+            nn.ReLU()
+        )
+
+        self.value_stream = nn.Sequential(
+            FactorizedNoisyLinear(512, 512, seed),
+            nn.ReLU(),
+            FactorizedNoisyLinear(512, 1, seed)
+        )
+
+        self.advantage_stream = nn.Sequential(
+            FactorizedNoisyLinear(512, 512, seed),
+            nn.ReLU(),
+            FactorizedNoisyLinear(512, self.action_size, seed)
+        )
+
+        self.feature_layer.apply(self.init_weights)
+        self.value_stream.apply(self.init_weights)
+        self.advantage_stream.apply(self.init_weights)
+
+    def forward(self, state):
+        x = self.feature_layer(state)
+        value = self.value_stream(x)
+        advantage = self.advantage_stream(x)
+        q_values = value.expand_as(advantage) + (
+                advantage - advantage.mean(dim=state.dim() - 1, keepdim=True).expand_as(advantage))
+        return q_values
+
+    @staticmethod
+    def init_weights(m):
+        if type(m) == nn.Linear:
+            torch.nn.init.xavier_uniform_(m.weight)
+            m.bias.data.fill_(0.01)
+~~~~
+
+
+
+
+
 
 
 ____
 
-#### 8. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
+#### ??. Algorithm Deep Q-network (With Experience replay and fixed Q-target)
 
-**8.1 Agent - Functionality**
+**??.1 Agent - Functionality**
 
 How we initialize the agent, this can of cause be done in sooo many ways, but here is an example:
 
@@ -288,7 +439,7 @@ def act(self, state, eps=0.):
 
 
 
-**8.2 Agent - Update network**
+**??.2 Agent - Update network**
 
 Here we see an example on how we can update the network from a batch of experience.
 
@@ -356,7 +507,7 @@ def soft_update(self, local_model, target_model, tau):
 
 
 
-**8.3 Experience Replay**
+**??.3 Experience Replay**
 
 This is an implementation of the Experience Replay, we call it the replay buffer.
 
@@ -421,7 +572,7 @@ class ReplayBuffer:
         return len(self.memory)
 ~~~~
 
-**8.5 Main function**
+**??.5 Main function**
 
 ```python
 def dqn(agent, n_episodes=500, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995):
