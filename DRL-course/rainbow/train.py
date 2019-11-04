@@ -76,8 +76,8 @@ def plot_score(scores, Ln_blue, Ln_olive):
     # print(mean_scores)
     Ln_blue.set_ydata(mean_scores)
     Ln_blue.set_xdata(range(0, len(scores), 5))
-    if len(scores) >= 10:
-        yMA = movingaverage(scores, 10)
+    if len(scores) >= 5:
+        yMA = movingaverage(scores, 5)
         Ln_olive.set_ydata(yMA)
         Ln_olive.set_xdata(range(0, len(scores)))
     plt.pause(0.1)
@@ -187,7 +187,7 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode - 100,
                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
-            torch.save(agent.qnetwork_local.state_dict(), str(save_file))
+            torch.save(agent.model.state_dict(), str(save_file))
             best_avg = np.mean(scores_window)
     with open(file, "a+") as f:
         f.write("\n\nbest score: " + str(max(scores)) + " at eps: " + str(scores.index(max(scores))))
@@ -229,7 +229,7 @@ if __name__ == '__main__':
     BATCH_SIZE = 64
     GAMMA = 0.99
     TAU = 1e-4
-    LR = 0.005
+    LR = 0.0005
     UPDATE_MODEL_EVERY = 4
     UPDATE_TARGET_EVERY = 1000
     use_soft_update = False
