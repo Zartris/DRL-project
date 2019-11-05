@@ -50,7 +50,7 @@ class RainbowAgent:
         else:
             self.memory = ReplayBuffer(self.action_size, self.buffer_size, self.batch_size, self.seed, self.device)
 
-        #plotting:
+        # plotting:
         self.losses = []
 
     def step(self, state, action, reward, next_state, done):
@@ -101,6 +101,11 @@ class RainbowAgent:
             eps (float): epsilon, for epsilon-greedy action selection
         """
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+        # TODO: Question for reviewers, should i disable noise here? hence put it on eval mode
+        #       I do see a faster growth in avg score in shorter training period,
+        #       but this might be from less exploring, hence might be bad in the longer run.
+        #       The noise is applied to the sampled memories under model update,
+        #       so this is why we might not need it here?
         self.model.eval()
         with torch.no_grad():
             action_values = self.model.forward(state)

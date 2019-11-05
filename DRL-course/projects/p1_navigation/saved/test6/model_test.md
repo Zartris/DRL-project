@@ -14,7 +14,7 @@
 	BATCH_SIZE: 64
 	GAMMA: 0.99
 	TAU: 0.0001
-	LR: 0.0005
+	LR: 0.0001
 	UPDATE_MODEL_EVERY: 4
 	UPDATE_TARGET_EVERY: 1000
 	use_soft_update: False
@@ -26,7 +26,7 @@
 	PER_a: 0.6
 	PER_b: 0.4
 	PER_bi: 0.001
-	PER_aeu: 2
+	PER_aeu: 1
 
 *train_info:*
 	episodes:400
@@ -37,5 +37,14 @@
 
 
 
-## Test data: 
+## train data: 
+
+	Episode 100	Average Score: 3.56
+	Episode 200	Average Score: 10.03
+	Episode 300	Average Score: 10.90
+	Episode 400	Average Score: 10.66
+
+
+best score: 20.0 at eps: 184
+## test result: 
 

@@ -12,7 +12,7 @@
 	continues: False
 	BUFFER_SIZE: 16384
 	BATCH_SIZE: 64
-	GAMMA: 0.99
+	GAMMA: 0.95
 	TAU: 0.0001
 	LR: 0.0005
 	UPDATE_MODEL_EVERY: 4
@@ -37,5 +37,15 @@
 
 
 
-## Test data: 
+## train data: 
 
+	Episode 100	Average Score: 4.60
+	Episode 200	Average Score: 8.42
+	Episode 300	Average Score: 10.89
+	Episode 400	Average Score: 12.39
+
+
+best score: 24.0 at eps: 364
+## test result: 
+
+	Episode 100	Average Score: 11.92

@@ -2,14 +2,14 @@ import time
 from collections import deque
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from unityagents import UnityEnvironment
 
 from rainbow.agents.rainbow_agent import RainbowAgent
 from rainbow.models.models import NoisyDDQN, DDQN
-import matplotlib.pyplot as plt
 
-import numpy as np
 
 def create_train_info(name, episodes, max_t, eps_start, eps_end, eps_decay):
     t_info = str(name) + "\n"
@@ -83,9 +83,60 @@ def plot_score(scores, Ln_blue, Ln_olive):
     plt.pause(0.1)
 
 
-def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.pth', n_episodes=2000000,
-        max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995,
-        plot=False, plot_title="title"):
+def unpack_braininfo(brain_name, all_brain_info):
+    brain_info = all_brain_info[brain_name]
+    next_state = brain_info.vector_observations[0]
+    reward = brain_info.rewards[0]
+    done = brain_info.local_done[0]
+    max_reached = brain_info.max_reached[0]
+    return next_state, reward, done, max_reached
+
+
+def test(agent, brain_name, test_env, file, n_episodes):
+    scores = []  # list containing scores from each episode
+    scores_window = deque(maxlen=100)  # last 100 scores
+    time_window = deque(maxlen=10)  # last 10 iter
+    eps = eps_start  # initialize epsilon
+    agent.model.set_training(False)
+    with open(file, "a+") as f:
+        f.write("\n## test result: \n\n")
+    for i_episode in range(1, n_episodes + 1):
+        state = test_env.reset(train_mode=True)[brain_name].vector_observations[0]
+        score = 0
+        start = time.time()
+        max_reached = False
+        while not max_reached:
+            action = int(agent.act(state, eps))
+            next_state, reward, done, max_reached = unpack_braininfo(brain_name, test_env.step(action))
+            state = next_state
+            score += reward
+            if done:
+                break
+        time_window.append(time.time() - start)
+        scores_window.append(score)  # save most recent score
+        scores.append(score)  # save most recent score
+        print('\rEpisode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
+            i_episode,
+            np.mean(
+                scores_window),
+            score,
+            np.mean(
+                time_window)),
+            end="")
+        if i_episode % 100 == 0:
+            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
+                                                                                         np.mean(scores_window),
+                                                                                         np.mean(time_window) * (
+                                                                                                 n_episodes - i_episode)))
+            with open(file, "a+") as f:
+                f.write('\tEpisode {}\tAverage Score: {:.2f}\n'.format(i_episode, np.mean(scores_window)))
+    return scores
+
+
+def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png", save_file='checkpoint.pth',
+          n_episodes=2000000,
+          max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995,
+          plot=False, plot_title="title"):
     """Deep Q-Learning.
 
     Params
@@ -97,9 +148,9 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
         eps_decay (float): multiplicative factor (per episode) for decreasing epsilon
     """
     if plot:
-        buffer = 25
-        min_score = -200
-        max_score = min_score + 10
+        buffer = 1
+        min_score = 0
+        max_score = min_score + buffer
         fig = plt.figure()
         # fig, axs = plt.subplots(2, 1)
         # score_ax = axs[0]
@@ -123,18 +174,15 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
     scores_window = deque(maxlen=100)  # last 100 scores
     time_window = deque(maxlen=10)  # last 10 iter
     eps = eps_start  # initialize epsilon
-    best_avg = 200.0
+    best_avg = 13.0
     for i_episode in range(1, n_episodes + 1):
-        env_info = env.reset(train_mode=True)[brain_name]
-        state = env_info.vector_observations[0]
+        state = train_env.reset(train_mode=True)[brain_name].vector_observations[0]
         score = 0
         start = time.time()
-        for t in range(max_t):
-            action = agent.act(state, eps)
-            env_info = env.step(action)
-            next_state = env_info.vector_observations[0]
-            reward = env_info.rewards
-            next_state, reward, done, _ = env.step(action)
+        max_reached = False
+        while not max_reached:
+            action = int(agent.act(state, eps))
+            next_state, reward, done, max_reached = unpack_braininfo(brain_name, train_env.step(action))
             agent.step(state, action, reward, next_state, done)
             state = next_state
             score += reward
@@ -153,7 +201,7 @@ def dqn(agent, file, scheduler=None, save_img="plot.png", save_file='checkpoint.
             score,
             np.mean(
                 time_window)),
-              end="")
+            end="")
         if plot and i_episode % 5 == 0:
             # update plot
             # losses = agent.losses
@@ -208,9 +256,16 @@ def update_loss_axis(losses, i_episode, loss_ax):
     loss_ax.set_ylim([np.argmin(losses) - 10, np.argmax(losses) + 10])
     loss_ax.set_xlim([0, len(losses)])
 
+
 if __name__ == '__main__':
+    # take test_seed before seeding all random variables
+    test_seed = np.random.randint(low=1, high=1000)
+    # Hyperparameters
+    seed = 0
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     game = "Banana.exe"
-    env = UnityEnvironment(file_name=game)
+    env = UnityEnvironment(file_name=game, seed=seed, no_graphics=True)
     # get the default brain
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
@@ -229,10 +284,6 @@ if __name__ == '__main__':
     print('States look like:', state)
     state_size = len(state)
     print('States have length:', state_size)
-    # Hyperparameters
-    seed = 0
-    np.random.seed(seed)
-    torch.manual_seed(seed)
     general_info = create_general_info("*general info:*", game, seed, state_size, action_size)
 
     # Agent Hyperparameters
@@ -241,7 +292,7 @@ if __name__ == '__main__':
     BATCH_SIZE = 64
     GAMMA = 0.99
     TAU = 1e-4
-    LR = 0.0005
+    LR = 0.001
     UPDATE_MODEL_EVERY = 4
     UPDATE_TARGET_EVERY = 1000
     use_soft_update = False
@@ -255,11 +306,13 @@ if __name__ == '__main__':
     PER_a = .6
     PER_b = .4
     PER_bi = 0.001
-    PER_aeu = 2
+    PER_aeu = 1
     per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
 
     # Training
     episodes = 400
+    # TODO: REMOVE
+    # eps and max_t is not used but is here anyway
     max_t = 1000
     eps_start = 1.0
     eps_end = 0.01
@@ -307,13 +360,14 @@ if __name__ == '__main__':
         f.write(agent_info + "\n")
         f.write(per_info + "\n")
         f.write(train_info + "\n\n")
-        f.write("\n## Test data: \n\n")
+        f.write("\n## train data: \n\n")
     models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
     agent = RainbowAgent(state_size, action_size, models, use_noise=use_noise, seed=seed,
                          continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                          LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
                          use_soft_update=use_soft_update, priority_method=priority_method,
                          per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu)
-    dqn(agent, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes, max_t=max_t,
-        eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay, plot=plot, plot_title=title)
+    train(agent, brain_name, env, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes, max_t=max_t,
+          eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay, plot=plot, plot_title=title)
+    test(agent, brain_name, env, file, 100)
     print("Done")

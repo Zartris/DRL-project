@@ -34,7 +34,7 @@ class FactorizedNoisyLinear(nn.Module):
     def forward(self, x):
         self.reset_noise()
 
-        if self.is_training:
+        if self.training:
             weight = self.weight_mu + self.weight_sigma * self.weight_epsilon
             bias = self.bias_mu + self.bias_sigma * self.bias_epsilon
         else:
@@ -44,6 +44,10 @@ class FactorizedNoisyLinear(nn.Module):
         y = F.linear(x, weight, bias)
 
         return y
+
+    # def train(self, mode=True):
+    #     self.is_training = mode
+    #     return nn.Module.train(self, mode=mode)
 
     def reset_parameters(self):
         std = 1 / math.sqrt(self.in_features)

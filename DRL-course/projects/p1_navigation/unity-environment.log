@@ -1,2 +1,5 @@
-04-11-2019 14:43:35
+05-11-2019 14:39:52
  
+Error
+Error: Global Illumination requires a graphics device to render albedo.
+

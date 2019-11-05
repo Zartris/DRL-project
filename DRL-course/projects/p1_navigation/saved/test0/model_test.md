@@ -39,3 +39,10 @@
 
 ## Test data: 
 
+	Episode 100	Average Score: 5.17
+	Episode 200	Average Score: 11.69
+	Episode 300	Average Score: 12.02
+	Episode 400	Average Score: 11.46
+
+
+best score: 21.0 at eps: 332
