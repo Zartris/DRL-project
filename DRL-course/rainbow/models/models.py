@@ -123,6 +123,11 @@ class NoisyDDQN(nn.Module):
                 advantage - advantage.mean(dim=state.dim() - 1, keepdim=True).expand_as(advantage))
         return q_values
 
+    def reset_noise(self):
+        for module in self.modules():
+            if isinstance(module, FactorizedNoisyLinear):
+                module.reset_noise()
+
     def set_training(self, training):
         for module in self.modules():
             if isinstance(module, FactorizedNoisyLinear):

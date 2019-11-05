@@ -236,7 +236,7 @@ def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png
 
         if np.mean(scores_window) >= best_avg:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
-                i_episode - 100,
+                i_episode,
                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
             torch.save(agent.model.state_dict(), str(save_file))
             best_avg = np.mean(scores_window)
@@ -288,11 +288,11 @@ if __name__ == '__main__':
 
     # Agent Hyperparameters
     continues = False
-    BUFFER_SIZE = (2 ** 14)
-    BATCH_SIZE = 64
+    BUFFER_SIZE = (2 ** 18)
+    BATCH_SIZE = 124
     GAMMA = 0.99
     TAU = 1e-4
-    LR = 0.001
+    LR = 0.0005
     UPDATE_MODEL_EVERY = 4
     UPDATE_TARGET_EVERY = 1000
     use_soft_update = False
@@ -302,15 +302,15 @@ if __name__ == '__main__':
 
     # PER Hyperparameters
     use_per = True
-    PER_e = 0.01
-    PER_a = .6
-    PER_b = .4
-    PER_bi = 0.001
-    PER_aeu = 1
+    PER_e = 0.000001
+    PER_a = .2
+    PER_b = .6
+    PER_bi = 0.00001
+    PER_aeu = 2
     per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
 
     # Training
-    episodes = 400
+    episodes = 800
     # TODO: REMOVE
     # eps and max_t is not used but is here anyway
     max_t = 1000

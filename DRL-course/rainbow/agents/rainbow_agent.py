@@ -169,6 +169,8 @@ class RainbowAgent:
         loss.backward()
         self.optimizer.step()
         # todo::Consider resetting noise here
+        self.model.reset_noise()
+        self.model_target.reset_noise()
         return loss.item()
 
     def compute_error(self, state, action, reward, next_state, done):
