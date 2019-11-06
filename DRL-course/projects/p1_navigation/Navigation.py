@@ -288,13 +288,13 @@ if __name__ == '__main__':
 
     # Agent Hyperparameters
     continues = False
-    BUFFER_SIZE = (2 ** 18)
-    BATCH_SIZE = 124
+    BUFFER_SIZE = (2 ** 14)
+    BATCH_SIZE = 64
     GAMMA = 0.99
     TAU = 1e-4
     LR = 0.0005
-    UPDATE_MODEL_EVERY = 4
-    UPDATE_TARGET_EVERY = 1000
+    UPDATE_MODEL_EVERY = 2
+    UPDATE_TARGET_EVERY = 500
     use_soft_update = False
     priority_method = "reward"
     agent_info = create_agent_info("*agent info:*", continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR,
@@ -302,10 +302,10 @@ if __name__ == '__main__':
 
     # PER Hyperparameters
     use_per = True
-    PER_e = 0.000001
+    PER_e = 0.00001
     PER_a = .2
-    PER_b = .6
-    PER_bi = 0.00001
+    PER_b = .4
+    PER_bi = 0.0001
     PER_aeu = 2
     per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
 
@@ -369,5 +369,8 @@ if __name__ == '__main__':
                          per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu)
     train(agent, brain_name, env, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes, max_t=max_t,
           eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay, plot=plot, plot_title=title)
+    if Path(save_file).exists():
+        agent.model.state_dict(torch.load(save_file))
+        agent.model_target.state_dict(torch.load(save_file))
     test(agent, brain_name, env, file, 100)
     print("Done")

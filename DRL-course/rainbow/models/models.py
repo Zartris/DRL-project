@@ -95,7 +95,7 @@ class NoisyDDQN(nn.Module):
         self.state_size = state_size
 
         self.feature_layer = nn.Sequential(
-            FactorizedNoisyLinear(self.state_size, 512, seed),
+            nn.Linear(self.state_size, 512),
             nn.ReLU()
         )
 
