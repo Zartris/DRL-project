@@ -288,29 +288,29 @@ if __name__ == '__main__':
 
     # Agent Hyperparameters
     continues = False
-    BUFFER_SIZE = (2 ** 14)
-    BATCH_SIZE = 64
+    BUFFER_SIZE = (2 ** 18)
+    BATCH_SIZE = 124
     GAMMA = 0.99
     TAU = 1e-4
     LR = 0.0005
-    UPDATE_MODEL_EVERY = 2
-    UPDATE_TARGET_EVERY = 500
+    UPDATE_MODEL_EVERY = 4
+    UPDATE_TARGET_EVERY = 1000
     use_soft_update = False
-    priority_method = "reward"
+    priority_method = "none"
     agent_info = create_agent_info("*agent info:*", continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR,
                                    UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY, use_soft_update, priority_method)
 
     # PER Hyperparameters
     use_per = True
-    PER_e = 0.00001
-    PER_a = .2
-    PER_b = .4
-    PER_bi = 0.0001
-    PER_aeu = 2
+    PER_e = 0.01
+    PER_a = 0.6
+    PER_b = 0.4
+    PER_bi = 0.001
+    PER_aeu = 1
     per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
 
     # Training
-    episodes = 800
+    episodes = 2000
     # TODO: REMOVE
     # eps and max_t is not used but is here anyway
     max_t = 1000

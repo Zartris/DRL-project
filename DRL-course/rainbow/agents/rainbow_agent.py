@@ -106,10 +106,10 @@ class RainbowAgent:
         #       but this might be from less exploring, hence might be bad in the longer run.
         #       The noise is applied to the sampled memories under model update,
         #       so this is why we might not need it here?
-        self.model.eval()
+        # self.model.eval()
         with torch.no_grad():
             action_values = self.model.forward(state)
-        self.model.train()
+        # self.model.train()
         # Epsilon-greedy action selection
         if np.random.random() > eps or self.use_noise:
             return np.argmax(action_values.detach().cpu().numpy())

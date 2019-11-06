@@ -100,15 +100,15 @@ class NoisyDDQN(nn.Module):
         )
 
         self.value_stream = nn.Sequential(
-            FactorizedNoisyLinear(512, 512, seed),
+            FactorizedNoisyLinear(512, 512, seed, name="value_stream1"),
             nn.ReLU(),
-            FactorizedNoisyLinear(512, 1, seed)
+            FactorizedNoisyLinear(512, 1, seed, name="value_stream2")
         )
 
         self.advantage_stream = nn.Sequential(
-            FactorizedNoisyLinear(512, 512, seed),
+            FactorizedNoisyLinear(512, 512, seed, name="advantage_stream1"),
             nn.ReLU(),
-            FactorizedNoisyLinear(512, self.action_size, seed)
+            FactorizedNoisyLinear(512, self.action_size, seed, name="advantage_stream2")
         )
 
         self.feature_layer.apply(self.init_weights)
