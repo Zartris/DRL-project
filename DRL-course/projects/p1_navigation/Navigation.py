@@ -7,13 +7,14 @@ import numpy as np
 import torch
 from unityagents import UnityEnvironment
 
-from rainbow.agents.rainbow_agent import RainbowAgent
-from rainbow.models.models import NoisyDDQN, DDQN
+from projects.p1_navigation.agents.rainbow_agent import RainbowAgent
+from projects.p1_navigation.models.models import NoisyDDQN, DDQN
 
 
-def create_train_info(name, episodes, max_t, eps_start, eps_end, eps_decay):
+def create_train_info(name, episodes, evaluation_interval, max_t, eps_start, eps_end, eps_decay):
     t_info = str(name) + "\n"
     t_info += "\tepisodes:" + str(episodes) + "\n"
+    t_info += "\tevaluation_interval:" + str(evaluation_interval) + "\n"
     t_info += "\tmax_t: " + str(max_t) + "\n"
     t_info += "\teps_start: " + str(eps_start) + "\n"
     t_info += "\teps_end: " + str(eps_end) + "\n"
@@ -30,7 +31,7 @@ def create_general_info(name, game, seed, state_size, action_size):
     return g_info
 
 
-def create_per_info(name, use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu):
+def create_per_info(name, use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start):
     per_info = str(name) + "\n"
     per_info += "\tuse_per:" + str(use_per) + "\n"
     if use_per:
@@ -39,10 +40,12 @@ def create_per_info(name, use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu):
         per_info += "\tPER_b: " + str(PER_b) + "\n"
         per_info += "\tPER_bi: " + str(PER_bi) + "\n"
         per_info += "\tPER_aeu: " + str(PER_aeu) + "\n"
+        per_info += "\tPER_learn_start " + str(PER_learn_start) + "\n"
     return per_info
 
 
-def create_agent_info(name, continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR, UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY,
+def create_agent_info(name, continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR, opt_eps, UPDATE_MODEL_EVERY,
+                      UPDATE_TARGET_EVERY,
                       use_soft_update, priority_method):
     agent_info = str(name) + "\n"
     agent_info += "\tAgent: rainbow\n"
@@ -52,6 +55,7 @@ def create_agent_info(name, continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR, 
     agent_info += "\tGAMMA: " + str(GAMMA) + "\n"
     agent_info += "\tTAU: " + str(TAU) + "\n"
     agent_info += "\tLR: " + str(LR) + "\n"
+    agent_info += "\topt_eps: " + str(opt_eps) + "\n"
     agent_info += "\tUPDATE_MODEL_EVERY: " + str(UPDATE_MODEL_EVERY) + "\n"
     agent_info += "\tUPDATE_TARGET_EVERY: " + str(UPDATE_TARGET_EVERY) + "\n"
     agent_info += "\tuse_soft_update: " + str(use_soft_update) + "\n"
@@ -76,8 +80,8 @@ def plot_score(scores, Ln_blue, Ln_olive):
     # print(mean_scores)
     Ln_blue.set_ydata(mean_scores)
     Ln_blue.set_xdata(range(0, len(scores), 5))
-    if len(scores) >= 5:
-        yMA = movingaverage(scores, 5)
+    if len(scores) >= 30:
+        yMA = movingaverage(scores, 30)
         Ln_olive.set_ydata(yMA)
         Ln_olive.set_xdata(range(0, len(scores)))
     plt.pause(0.1)
@@ -92,16 +96,14 @@ def unpack_braininfo(brain_name, all_brain_info):
     return next_state, reward, done, max_reached
 
 
-def test(agent, brain_name, test_env, file, n_episodes):
+def eval(agent, brain_name, test_env, n_episodes, train_episode, model_save_file, current_best):
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     time_window = deque(maxlen=10)  # last 10 iter
     eps = eps_start  # initialize epsilon
-    agent.model.set_training(False)
-    with open(file, "a+") as f:
-        f.write("\n## test result: \n\n")
+    agent.model.eval()
     for i_episode in range(1, n_episodes + 1):
-        state = test_env.reset(train_mode=True)[brain_name].vector_observations[0]
+        state = test_env.reset(train_mode=False)[brain_name].vector_observations[0]
         score = 0
         start = time.time()
         max_reached = False
@@ -128,14 +130,16 @@ def test(agent, brain_name, test_env, file, n_episodes):
                                                                                          np.mean(scores_window),
                                                                                          np.mean(time_window) * (
                                                                                                  n_episodes - i_episode)))
-            with open(file, "a+") as f:
-                f.write('\tEpisode {}\tAverage Score: {:.2f}\n'.format(i_episode, np.mean(scores_window)))
-    return scores
+            if np.mean(scores_window) >= current_best:
+                torch.save(agent.model.state_dict(), str(model_save_file))
+                current_best = np.mean(scores_window)
+    agent.model.train()
+    return '\n\ttrain_episode: {}\t Average Score over {} episodes: {}'.format(str(train_episode), str(n_episodes),
+                                                                               np.mean(scores)), current_best
 
 
-def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png", save_file='checkpoint.pth',
-          n_episodes=2000000,
-          max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.995,
+def train(agent, brain_name, train_env, file, save_img="plot.png", save_file='checkpoint.pth',
+          n_episodes=2000000, evaluation_interval=200, eps_start=1.0, eps_end=0.01, eps_decay=0.995,
           plot=False, plot_title="title"):
     """Deep Q-Learning.
 
@@ -175,6 +179,7 @@ def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png
     time_window = deque(maxlen=10)  # last 10 iter
     eps = eps_start  # initialize epsilon
     best_avg = 13.0
+    eval_result = "\n## test result: \n\n"
     for i_episode in range(1, n_episodes + 1):
         state = train_env.reset(train_mode=True)[brain_name].vector_observations[0]
         score = 0
@@ -189,11 +194,14 @@ def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png
             if done:
                 break
         time_window.append(time.time() - start)
+        if i_episode % evaluation_interval == 0:
+            # Time for evaluation
+            log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
+            eval_result += log_result
+            best_avg = current_best
         scores_window.append(score)  # save most recent score
         scores.append(score)  # save most recent score
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
-        if scheduler is not None:
-            scheduler.step(np.mean(scores_window), i_episode)
         print('\rEpisode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
             i_episode,
             np.mean(
@@ -203,13 +211,6 @@ def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png
                 time_window)),
             end="")
         if plot and i_episode % 5 == 0:
-            # update plot
-            # losses = agent.losses
-
-            # loss
-            # update_loss_axis(losses, i_episode, loss_ax)
-            # plot_loss(loss_line_blue, losses)
-
             # score
             # Update axis:
             window = scores[-5:]
@@ -238,8 +239,10 @@ def train(agent, brain_name, train_env, file, scheduler=None, save_img="plot.png
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode,
                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
-            torch.save(agent.model.state_dict(), str(save_file))
-            best_avg = np.mean(scores_window)
+            log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
+            eval_result += log_result
+            best_avg = current_best
+
     with open(file, "a+") as f:
         f.write("\n\nbest score: " + str(max(scores)) + " at eps: " + str(scores.index(max(scores))))
     return scores, best_avg
@@ -288,16 +291,17 @@ if __name__ == '__main__':
 
     # Agent Hyperparameters
     continues = False
-    BUFFER_SIZE = (2 ** 18)
-    BATCH_SIZE = 124
+    BUFFER_SIZE = (2 ** 20)
+    BATCH_SIZE = 32
     GAMMA = 0.99
     TAU = 1e-4
     LR = 0.0005
+    opt_eps = 1.5e-4  # Adam epsilon
     UPDATE_MODEL_EVERY = 4
-    UPDATE_TARGET_EVERY = 1000
+    UPDATE_TARGET_EVERY = 8000
     use_soft_update = False
-    priority_method = "none"
-    agent_info = create_agent_info("*agent info:*", continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR,
+    priority_method = "reward"
+    agent_info = create_agent_info("*agent info:*", continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR, opt_eps,
                                    UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY, use_soft_update, priority_method)
 
     # PER Hyperparameters
@@ -305,19 +309,21 @@ if __name__ == '__main__':
     PER_e = 0.01
     PER_a = 0.6
     PER_b = 0.4
-    PER_bi = 0.001
+    PER_bi = 0.00001
     PER_aeu = 1
-    per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu)
+    PER_learn_start = 0
+    per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start)
 
     # Training
     episodes = 2000
+    evaluation_interval = 200
     # TODO: REMOVE
     # eps and max_t is not used but is here anyway
     max_t = 1000
     eps_start = 1.0
     eps_end = 0.01
     eps_decay = 0.995
-    train_info = create_train_info("*train_info:*", episodes, max_t, eps_start, eps_end, eps_decay)
+    train_info = create_train_info("*train_info:*", episodes, evaluation_interval, max_t, eps_start, eps_end, eps_decay)
 
     base_dir = Path("saved", "test0")
 
@@ -366,11 +372,13 @@ if __name__ == '__main__':
                          continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                          LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
                          use_soft_update=use_soft_update, priority_method=priority_method,
-                         per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu)
-    train(agent, brain_name, env, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes, max_t=max_t,
-          eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay, plot=plot, plot_title=title)
+                         per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu,
+                         PER_learn_start=PER_learn_start)
+    train(agent, brain_name, env, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes,
+          evaluation_interval=evaluation_interval, eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay, plot=plot,
+          plot_title=title)
     if Path(save_file).exists():
         agent.model.state_dict(torch.load(save_file))
         agent.model_target.state_dict(torch.load(save_file))
-    test(agent, brain_name, env, file, 100)
+    # eval(agent, brain_name, env, file, 100)
     print("Done")
