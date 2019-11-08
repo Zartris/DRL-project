@@ -103,7 +103,7 @@ def eval(agent, brain_name, test_env, n_episodes, train_episode, model_save_file
     eps = eps_start  # initialize epsilon
     agent.model.eval()
     for i_episode in range(1, n_episodes + 1):
-        state = test_env.reset(train_mode=False)[brain_name].vector_observations[0]
+        state = test_env.reset(train_mode=True)[brain_name].vector_observations[0]
         score = 0
         start = time.time()
         max_reached = False
@@ -117,7 +117,7 @@ def eval(agent, brain_name, test_env, n_episodes, train_episode, model_save_file
         time_window.append(time.time() - start)
         scores_window.append(score)  # save most recent score
         scores.append(score)  # save most recent score
-        print('\rEpisode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
+        print('\rTest: Episode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
             i_episode,
             np.mean(
                 scores_window),
@@ -126,7 +126,7 @@ def eval(agent, brain_name, test_env, n_episodes, train_episode, model_save_file
                 time_window)),
             end="")
         if i_episode % 100 == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
+            print('Test: \rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
                                                                                          np.mean(scores_window),
                                                                                          np.mean(time_window) * (
                                                                                                  n_episodes - i_episode)))
@@ -244,6 +244,7 @@ def train(agent, brain_name, train_env, file, save_img="plot.png", save_file='ch
             best_avg = current_best
 
     with open(file, "a+") as f:
+        f.write(eval_result)
         f.write("\n\nbest score: " + str(max(scores)) + " at eps: " + str(scores.index(max(scores))))
     return scores, best_avg
 
@@ -268,7 +269,7 @@ if __name__ == '__main__':
     np.random.seed(seed)
     torch.manual_seed(seed)
     game = "Banana.exe"
-    env = UnityEnvironment(file_name=game, seed=seed, no_graphics=True)
+    env = UnityEnvironment(file_name=game, seed=seed, no_graphics=False)
     # get the default brain
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
@@ -294,12 +295,12 @@ if __name__ == '__main__':
     BUFFER_SIZE = (2 ** 20)
     BATCH_SIZE = 32
     GAMMA = 0.99
-    TAU = 1e-4
-    LR = 0.0005
+    TAU = 1e-3
+    LR = 0.00005
     opt_eps = 1.5e-4  # Adam epsilon
     UPDATE_MODEL_EVERY = 4
     UPDATE_TARGET_EVERY = 8000
-    use_soft_update = False
+    use_soft_update = True
     priority_method = "reward"
     agent_info = create_agent_info("*agent info:*", continues, BUFFER_SIZE, BATCH_SIZE, GAMMA, TAU, LR, opt_eps,
                                    UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY, use_soft_update, priority_method)
