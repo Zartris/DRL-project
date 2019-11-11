@@ -9,7 +9,7 @@ import torch.nn.functional as F
 class FactorizedNoisyLinear(nn.Module):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, in_features, out_features, seed, is_training=True, std_init=0.5, name="noisyLinear"):
+    def __init__(self, in_features, out_features, seed, is_training=True, std_init=0.1, name="noisyLinear"):
         super(FactorizedNoisyLinear, self).__init__()
         self.seed = seed
         torch.manual_seed(self.seed)

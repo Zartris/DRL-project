@@ -194,11 +194,7 @@ def train(agent, brain_name, train_env, file, save_img="plot.png", save_file='ch
             if done:
                 break
         time_window.append(time.time() - start)
-        if i_episode % evaluation_interval == 0:
-            # Time for evaluation
-            log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
-            eval_result += log_result
-            best_avg = current_best
+
         scores_window.append(score)  # save most recent score
         scores.append(score)  # save most recent score
         eps = max(eps_end, eps_decay * eps)  # decrease epsilon
@@ -239,6 +235,12 @@ def train(agent, brain_name, train_env, file, save_img="plot.png", save_file='ch
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
                 i_episode,
                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
+            #log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
+            #eval_result += log_result
+            #best_avg = current_best
+
+        if i_episode % evaluation_interval == 0:
+            # Time for evaluation
             log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
             eval_result += log_result
             best_avg = current_best
@@ -268,7 +270,7 @@ if __name__ == '__main__':
     seed = 0
     np.random.seed(seed)
     torch.manual_seed(seed)
-    game = "Banana.exe"
+    game = "Banana.x86_64"
     env = UnityEnvironment(file_name=game, seed=seed, no_graphics=False)
     # get the default brain
     brain_name = env.brain_names[0]
