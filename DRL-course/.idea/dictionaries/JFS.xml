@@ -2,6 +2,7 @@
   <dictionary name="JFS">
     <words>
       <w>ddqn</w>
+      <w>timestep</w>
     </words>
   </dictionary>
 </component>

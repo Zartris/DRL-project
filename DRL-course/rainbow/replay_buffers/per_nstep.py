@@ -7,8 +7,8 @@ import torch
 class PerNStep:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, capacity, batch_size, seed, epsilon=.001, alpha=.6, beta=.4, beta_increase=1e-3,
-                 absolute_error_upper=3, n_step=3):
+    def __init__(self, capacity, batch_size, seed, state_size, epsilon=.001, alpha=.6, beta=.4, beta_increase=1e-3,
+                 absolute_error_upper=3, n_step=3, gamma=.99):
         """
         :param capacity: Max amount of experience saved in the structure
         :param epsilon: small value to insure all probabilities is not 0
@@ -22,6 +22,7 @@ class PerNStep:
         :param beta_increase: is the increase in beta for each sampling. 0.001 = 1e-3
         :param absolute_error_upper: Setting a cap on how big an error (priority) can be.
         :param n_step: store the most recent n-step transitions or experiences instead of the default 1.
+        :param gamma: This is the discount value
         """
         ## Just like PER
         # seeding
@@ -31,7 +32,9 @@ class PerNStep:
         self.capacity = capacity
         self.batch_size = batch_size
         self.memory_tree = SumTree(self.capacity, seed)
-        self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
+        self.experience = namedtuple("Experience",
+                                     field_names=["timestep", "state", "action", "reward", "next_state", "done"])
+
         self.epsilon = epsilon
         self.alpha = alpha
         self.beta = beta
@@ -40,8 +43,16 @@ class PerNStep:
         self.seed = seed
 
         ## N-Step
+        self.t = 0  # Internal time step counter
         self.n_step = n_step
         self.n_step_buff = deque(maxlen=n_step)
+        self.gamma = gamma
+        self.blank_experience = self.experience(timestep=0,
+                                                state=torch.zeros(state_size[0], state_size[1], dtype=torch.uint8),
+                                                action=None,
+                                                reward=0,
+                                                next_state=torch.zeros(state_size[0], state_size[1], dtype=torch.uint8),
+                                                done=False)
 
     def __len__(self):
         """Return the current size of internal memory."""
@@ -113,14 +124,16 @@ class PerNStep:
         is_weights /= is_weights.max()
         return idxs, minibatch, is_weights
 
-    def add(self, experience, error=None):
-        if error is None:
-            priority = np.amax(self.memory_tree.tree[-self.memory_tree.capacity:])
-            if priority == 0:
-                priority = self.absolute_error_upper
-        else:
-            priority = min((abs(error) + self.epsilon) ** self.alpha, self.absolute_error_upper)
-        self.memory_tree.add(experience, priority)
+    def add(self, state, action, reward, next_state, done):
+        exp = self.experience(self.t, state, action, reward, next_state, done)
+        self.n_step_buff.append(exp)
+        self.t = (0 if done else self.t + 1)
+        if len(self.n_step_buff) < self.n_step:
+            return None
+
+        priority = self._compute_n_step_reward(self.n_step_buff, self.gamma)
+        priority = min((abs(priority) + self.epsilon) ** self.alpha, self.absolute_error_upper)
+        self.memory_tree.add(exp, priority)
 
     def update_memory_tree(self, idxs, errors):
         errors = errors + self.epsilon
@@ -130,7 +143,26 @@ class PerNStep:
         for idx, p in zip(idxs, ps):
             self.memory_tree.update(idx, p)
 
+    @staticmethod
+    def _compute_n_step_reward(n_step_buff, gamma):
+        # Sort so only experiences with timestep higher than current exp is used:
+        timestep = n_step_buff[0].timestep
+        relevant_transitions = []
+        for transition in list(n_step_buff):
+            if timestep == transition.timestep:
+                relevant_transitions.append(transition)
+                timestep += 1
+            else:
+                break
 
+        # Take last element in deque and add the reward
+        rew = relevant_transitions[-1].reward
+        for transition in reversed(relevant_transitions[:-1]):
+            reward, done = transition.reward, transition.done
+            rew = reward + gamma * rew * (1 - done)
+        return rew
+
+#https://github.com/Kaixhin/Rainbow/blob/master/memory.py
 class SumTree:
     def __init__(self, capacity, seed):
         torch.manual_seed(seed)
@@ -155,9 +187,7 @@ class SumTree:
         # Update the leaf
         self.update(tree_index, priority)
         # Add 1 to data_pointer
-        self.data_pointer += 1
-        if self.data_pointer >= self.capacity:
-            self.data_pointer = 0
+        self.data_pointer = (self.data_pointer + 1) % self.capacity
         if self.data_length < self.capacity:
             self.data_length += 1
 
@@ -191,6 +221,10 @@ class SumTree:
         data_index = leaf_index - self.capacity + 1
 
         return leaf_index, self.tree[leaf_index], self.data[data_index]
+
+    # Returns data given a data index
+    def get_data(self, data_index):
+        return self.data[data_index % self.capacity]
 
     @staticmethod
     def is_power_of_2(n):
