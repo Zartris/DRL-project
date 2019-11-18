@@ -32,16 +32,16 @@ def create_general_info(name, game, seed, state_size, action_size):
     return g_info
 
 
-def create_per_info(name, use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start):
+def create_per_info(name, RB_method, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start, n_step):
     per_info = str(name) + "\n"
-    per_info += "\tuse_per:" + str(use_per) + "\n"
-    if use_per:
-        per_info += "\tPER_e: " + str(PER_e) + "\n"
-        per_info += "\tPER_a: " + str(PER_a) + "\n"
-        per_info += "\tPER_b: " + str(PER_b) + "\n"
-        per_info += "\tPER_bi: " + str(PER_bi) + "\n"
-        per_info += "\tPER_aeu: " + str(PER_aeu) + "\n"
-        per_info += "\tPER_learn_start " + str(PER_learn_start) + "\n"
+    per_info += "\tRB_method:" + str(RB_method) + "\n"
+    per_info += "\tPER_e: " + str(PER_e) + "\n"
+    per_info += "\tPER_a: " + str(PER_a) + "\n"
+    per_info += "\tPER_b: " + str(PER_b) + "\n"
+    per_info += "\tPER_bi: " + str(PER_bi) + "\n"
+    per_info += "\tPER_aeu: " + str(PER_aeu) + "\n"
+    per_info += "\tPER_learn_start " + str(PER_learn_start) + "\n"
+    per_info += "\tn_step " + str(n_step) + "\n"
     return per_info
 
 
@@ -268,7 +268,7 @@ def update_loss_axis(losses, i_episode, loss_ax):
 
 
 if __name__ == '__main__':
-    test_agent = True
+    test_agent = False
     cwd = os.getcwd()
     model_to_load = Path(cwd, "saved", "test17", "rainbow_checkpoint.pth")
     # take test_seed before seeding all random variables
@@ -315,14 +315,15 @@ if __name__ == '__main__':
                                    UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY, use_soft_update, priority_method)
 
     # PER Hyperparameters
-    use_per = True
+    RB_method = "nstep_per"  # choices: nstep_per, per, replay_buffer
     PER_e = 0.01
     PER_a = 0.6
     PER_b = 0.4
     PER_bi = 0.00001
     PER_aeu = 1
     PER_learn_start = 0
-    per_info = create_per_info("*per_info:*", use_per, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start)
+    n_step = 8
+    per_info = create_per_info("*per_info:*", RB_method, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start, n_step)
 
     # Training
     episodes = 2000
@@ -348,7 +349,9 @@ if __name__ == '__main__':
         title += "Normal, "
 
     title += "agent: rainbow, "
-    if use_per:
+    if RB_method == "nstep_per":
+        title += "NSTEP_PER-" + priority_method + ", "
+    elif RB_method == "per":
         title += "PER-" + priority_method + ", "
     else:
         title += "ER, "
@@ -366,8 +369,8 @@ if __name__ == '__main__':
                              continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                              LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
                              use_soft_update=use_soft_update, priority_method=priority_method,
-                             per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu,
-                             PER_learn_start=PER_learn_start)
+                             RB_method=RB_method, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu,
+                             PER_learn_start=PER_learn_start, n_step=n_step)
         state_dict = torch.load(str(model_to_load))
         agent.model.load_state_dict(state_dict)
         eval(agent, brain_name, env, 100, set_fast_mode=True)
@@ -395,8 +398,8 @@ if __name__ == '__main__':
                              continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                              LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
                              use_soft_update=use_soft_update, priority_method=priority_method,
-                             per=use_per, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu,
-                             PER_learn_start=PER_learn_start)
+                             RB_method=RB_method, PER_e=PER_e, PER_a=PER_a, PER_b=PER_b, PER_bi=PER_bi, PER_aeu=PER_aeu,
+                             PER_learn_start=PER_learn_start, n_step=n_step)
         train(agent, brain_name, env, file=file, save_img=save_image, save_file=save_file, n_episodes=episodes,
               evaluation_interval=evaluation_interval, eps_start=eps_start, eps_end=eps_end, eps_decay=eps_decay,
               plot=plot,

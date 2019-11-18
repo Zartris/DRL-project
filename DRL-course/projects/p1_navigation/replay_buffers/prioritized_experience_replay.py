@@ -106,7 +106,8 @@ class PrioritizedReplayBuffer:
         is_weights /= is_weights.max()
         return idxs, minibatch, is_weights
 
-    def add(self, experience, error=None):
+    def add(self, state, action, reward, next_state, done, error=None):
+        experience = self.experience(state, action, reward, next_state, done)
         if error is None:
             priority = np.amax(self.memory_tree.tree[-self.memory_tree.capacity:])
             if priority == 0:

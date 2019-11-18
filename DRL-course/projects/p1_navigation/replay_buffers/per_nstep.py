@@ -48,11 +48,11 @@ class PerNStep:
         self.n_step_buff = deque(maxlen=n_step)
         self.gamma = gamma
         self.blank_experience = self.experience(timestep=0,
-                                                state=torch.zeros(state_size[0], state_size[1], dtype=torch.uint8),
+                                                state=torch.zeros(state_size, dtype=torch.float64),
                                                 action=None,
                                                 reward=0,
-                                                next_state=torch.zeros(state_size[0], state_size[1], dtype=torch.uint8),
-                                                done=True)
+                                                next_state=torch.zeros(state_size, dtype=torch.float64),
+                                                done=False)
 
     def __len__(self):
         """Return the current size of internal memory."""
@@ -112,21 +112,6 @@ class PerNStep:
                 """
                 leaf_index, data_index, priority, data = self.memory_tree.get_leaf(value)
 
-            # Retrieve all required experience data (idx + n)
-            n_step_experiences = self._get_n_step_experience(data_index)
-            state = n_step_experiences[0].state.to(device=self.device)
-            next_state = torch.stack([exp.state for exp in n_step_experiences[1:self.n_step]]).to(
-                device=self.device)
-            action = n_step_experiences[0].action.to(device=self.device)
-
-            # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
-            reward = torch.tensor(
-                [self._compute_n_step_reward(n_step_experiences, self.gamma)],
-                dtype=torch.float32, device=self.device)
-            # Mask for non-terminal nth next states
-            done = torch.tensor([n_step_experiences[-1].done], dtype=torch.float32, device=self.device)
-            data = self.experience(n_step_experiences[0].timestep, state, action, reward, next_state, done)
-
             # P(i) = p_i**a / sum_k p_k**a
             sampling_probabilities = priority / self.memory_tree.total_priority
 
@@ -139,14 +124,20 @@ class PerNStep:
         is_weights /= is_weights.max()
         return idxs, minibatch, is_weights
 
-    def add(self, state, action, reward, next_state, done):
-        exp = self.experience(self.t, state, action, reward, next_state, done)
+    @staticmethod
+    def _is_done(n_step_experience):
+        done = False
+        for exp in n_step_experience:
+            done = done or exp[-1]
+        return done
+
+    def add(self, state, action, reward, next_state, done, error=None):
+        exp = self.experience(self.t, torch.from_numpy(state), action, reward, torch.from_numpy(next_state), done)
         self.n_step_buff.append(exp)
         self.t = (0 if done else self.t + 1)
         if len(self.n_step_buff) < self.n_step:
             return None
-
-        priority = self._compute_n_step_reward(self.n_step_buff, self.gamma)
+        exp, priority = self._get_n_step_info(self.n_step_buff, self.gamma)
         priority = min((abs(priority) + self.epsilon) ** self.alpha, self.absolute_error_upper)
         self.memory_tree.add(exp, priority)
 
@@ -158,10 +149,8 @@ class PerNStep:
         for idx, p in zip(idxs, ps):
             self.memory_tree.update(idx, p)
 
-    @staticmethod
-    def _compute_n_step_reward(n_step_buff, gamma):
-        # Sort so only experiences with timestep higher than current exp is used:
-        timestep = n_step_buff[0].timestep
+    def _get_n_step_info(self, n_step_buff, gamma):
+        timestep, org_state, org_action, _, _, _ = n_step_buff[0]
         relevant_transitions = []
         for transition in list(n_step_buff):
             if timestep == transition.timestep:
@@ -169,11 +158,30 @@ class PerNStep:
                 timestep += 1
             else:
                 break
+        # Take last element in deque and add the reward
+        rew, n_state, done = relevant_transitions[-1][-3:]
+        for transition in reversed(relevant_transitions[:-1]):
+            reward, n_s, d = transition.reward, transition.next_state, transition.done
+            rew = reward + gamma * rew * (1 - done)
+            n_state, done = (n_s, d) if d else (n_state, done)
+        return self.experience(timestep, org_state, org_action, rew, n_state, done), rew
+
+    @staticmethod
+    def _compute_n_step_reward(n_step_buff, gamma):
+        # Sort so only experiences with timestep higher than current exp is used:
+        timestep = n_step_buff[0][0]
+        relevant_transitions = []
+        for transition in list(n_step_buff):
+            if timestep == transition[0]:
+                relevant_transitions.append(transition)
+                timestep += 1
+            else:
+                break
 
         # Take last element in deque and add the reward
-        rew = relevant_transitions[-1].reward
+        rew = relevant_transitions[-1][3]
         for transition in reversed(relevant_transitions[:-1]):
-            reward, done = transition.reward, transition.done
+            reward, done = transition[3], transition[-1]
             rew = reward + gamma * rew * (1 - done)
         return rew
 
@@ -185,9 +193,9 @@ class PerNStep:
         experiences[0] = self.memory_tree.get_data(idx)
         for i in range(self.n_step):
             exp = self.memory_tree.get_data(idx + i)
-            experiences[i] = exp
-            if exp.done:
+            if exp == 0 or exp[-1]:
                 break
+            experiences[i] = exp
         return experiences
 
 
