@@ -10,7 +10,7 @@
       <sourceFolder url="file://$MODULE_DIR$/DQN" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rainbow" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.6 (drl)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.6 (unity)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

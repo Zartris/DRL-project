@@ -277,7 +277,7 @@ if __name__ == '__main__':
     seed = 0
     np.random.seed(seed)
     torch.manual_seed(seed)
-    game = "Banana.x86_64"
+    game = "Banana.exe"
     env = UnityEnvironment(file_name=game, seed=test_seed if test_agent else seed, no_graphics=False)
     # get the default brain
     brain_name = env.brain_names[0]
@@ -302,12 +302,12 @@ if __name__ == '__main__':
     # Agent Hyperparameters
     continues = False
     BUFFER_SIZE = (2 ** 20)
-    BATCH_SIZE = 32
+    BATCH_SIZE = 512
     GAMMA = 0.99
     TAU = 1e-3
     LR = 0.00005
     opt_eps = 1.5e-4  # Adam epsilon
-    UPDATE_MODEL_EVERY = 4
+    UPDATE_MODEL_EVERY = 10
     UPDATE_TARGET_EVERY = 8000
     use_soft_update = True
     priority_method = "reward"
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     PER_a = 0.6
     PER_b = 0.4
     PER_bi = 0.00001
-    PER_aeu = 1
+    PER_aeu = 3
     PER_learn_start = 0
     n_step = 8
     per_info = create_per_info("*per_info:*", RB_method, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start, n_step)
