@@ -12,10 +12,30 @@ class RainbowAgent:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def __init__(self,
-                 state_size, action_size, models, use_noise, seed, continues=False,
-                 BUFFER_SIZE=(2 ** 20), BATCH_SIZE=64, GAMMA=0.99, TAU=1e-3, LR=5e-4, UPDATE_MODEL_EVERY=4,
-                 UPDATE_TARGET_EVERY=1000, use_soft_update=False, priority_method="reward", RB_method="nstep_per",
-                 PER_e=0.01, PER_a=.6, PER_b=.4, PER_bi=0.001, PER_aeu=3, PER_learn_start=20000, n_step=3):
+                 state_size: int,
+                 action_size: int,
+                 models: list,
+                 use_noise: bool,
+                 seed: int,
+                 continues: bool = False,
+                 BUFFER_SIZE: int = (2 ** 20),
+                 BATCH_SIZE: int = 64,
+                 GAMMA: float = 0.99,
+                 TAU: float = 1e-3,
+                 LR: float = 5e-4,
+                 UPDATE_MODEL_EVERY: int = 4,
+                 UPDATE_TARGET_EVERY: int = 1000,
+                 use_soft_update: bool = False,
+                 priority_method: str = "reward",
+                 RB_method: str = "nstep_per",
+                 PER_e: float = 0.01,
+                 PER_a: float = .6,
+                 PER_b: float = .4,
+                 PER_bi: float = 0.001,
+                 PER_aeu: int = 3,
+                 PER_learn_start: int = 20000,
+                 n_step: int = 3,
+                 atom_size: int = 51):
         # seed for comparison
         self.seed = seed
         np.random.seed(self.seed)
@@ -61,6 +81,17 @@ class RainbowAgent:
         else:
             self.memory = ReplayBuffer(self.action_size, self.buffer_size, self.batch_size, self.seed, self.device)
             self.per = False
+
+        # Distributional aspect:
+        # The support for the value distribution. Set to 51 for C51
+        self.atom_size = atom_size
+        # Break the range of rewards into 51 uniformly spaced values (support)
+        self.v_max = 5 * self.n_step  # Rewards are clipped to -20, 20
+        self.v_min = -5 * self.n_step
+        self.support = torch.linspace(
+            self.v_min, self.v_max, self.atom_size
+        ).to(self.device)
+
         # plotting:
         self.losses = []
 
@@ -128,11 +159,7 @@ class RainbowAgent:
         with torch.no_grad():
             action_values = self.model.forward(state)
         # self.model.train()
-        # Epsilon-greedy action selection
-        if np.random.random() > eps or self.use_noise:
-            return np.argmax(action_values.detach().cpu().numpy())
-        else:
-            return np.random.choice(np.arange(self.action_size))
+        return np.argmax(action_values.detach().cpu().numpy())
 
     def learn(self):
         """Update value parameters using given batch of experience tuples.
@@ -145,14 +172,16 @@ class RainbowAgent:
         if self.per:
             idxs, experiences, is_weights = self.memory.sample()
             is_weights = torch.from_numpy(is_weights).float().to(self.device)
-            states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
+            states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(
+                self.device)
             if self.continues:
                 actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(
                     self.device)
             else:
                 actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(
                     self.device)
-            rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(self.device)
+            rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(
+                self.device)
             next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(
                 self.device)
             dones = torch.from_numpy(
@@ -161,7 +190,7 @@ class RainbowAgent:
         else:
             experiences = self.memory.sample()
             states, actions, rewards, next_states, dones = experiences
-        #todo:: Test if this is ok.
+        # todo:: Test if this is ok.
         # with torch.no_grad():
 
         # Getting the max action of local network (using weights w)

@@ -3,8 +3,9 @@ import torch
 import torch.nn.functional as F
 from torch import optim
 
-from replay_buffers.experience_replay import ReplayBuffer
-from replay_buffers.prioritized_experience_replay import PrioritizedReplayBuffer
+from rainbow.replay_buffers.experience_replay import ReplayBuffer
+from rainbow.replay_buffers.per_nstep import PerNStep
+from rainbow.replay_buffers.prioritized_experience_replay import PrioritizedReplayBuffer
 
 
 class RainbowAgent:
@@ -13,9 +14,8 @@ class RainbowAgent:
     def __init__(self,
                  state_size, action_size, models, use_noise, seed, continues=False,
                  BUFFER_SIZE=(2 ** 20), BATCH_SIZE=64, GAMMA=0.99, TAU=1e-3, LR=5e-4, UPDATE_MODEL_EVERY=4,
-                 UPDATE_TARGET_EVERY=1000, use_soft_update=False, priority_method="reward", per=True,
-                 PER_e=0.01, PER_a=.6, PER_b=.4, PER_bi=0.001, PER_aeu=3
-                 ):
+                 UPDATE_TARGET_EVERY=1000, use_soft_update=False, priority_method="reward", RB_method="nstep_per",
+                 PER_e=0.01, PER_a=.6, PER_b=.4, PER_bi=0.001, PER_aeu=3, PER_learn_start=20000, n_step=3):
         # seed for comparison
         self.seed = seed
         np.random.seed(self.seed)
@@ -32,24 +32,35 @@ class RainbowAgent:
         self.UPDATE_TARGET_EVERY = UPDATE_TARGET_EVERY
         self.use_soft_update = use_soft_update
         self.priority_method = priority_method
-        self.per = per
         self.t_step = 0
+        self.learn_start = PER_learn_start
 
         # Double DQN or QN:
         self.use_noise = use_noise
         self.model = models[0].to(self.device)
         self.model_target = models[1].to(self.device)
         self.continues = continues
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1.5e-4)
+
+        # N-step:
+        self.n_step = n_step
 
         # Priority Experience Replay:
-        if self.per:
+        self.RB_method = RB_method
+        if self.RB_method == "nstep_per":
+            self.memory = PerNStep(capacity=self.buffer_size, batch_size=self.batch_size, seed=self.seed,
+                                   state_size=self.state_size, epsilon=PER_e, alpha=PER_a, beta=PER_b,
+                                   beta_increase=PER_bi, absolute_error_upper=PER_aeu,
+                                   n_step=self.n_step, gamma=self.gamma)
+            self.per = True
+        elif self.RB_method == "per":
             self.memory = PrioritizedReplayBuffer(capacity=self.buffer_size, batch_size=self.batch_size,
                                                   seed=self.seed, epsilon=PER_e, alpha=PER_a, beta=PER_b,
                                                   beta_increase=PER_bi, absolute_error_upper=PER_aeu)
+            self.per = True
         else:
             self.memory = ReplayBuffer(self.action_size, self.buffer_size, self.batch_size, self.seed, self.device)
-
+            self.per = False
         # plotting:
         self.losses = []
 
@@ -72,9 +83,15 @@ class RainbowAgent:
                 error = self.compute_error(state, action, reward, next_state, done)
             else:
                 error = reward
-            self.memory.add((state, action, reward, next_state, done), error)
+            self.memory.add(state, action, reward, next_state, done, error)
         else:
             self.memory.add(state, action, reward, next_state, done)
+        # Filling memory
+        if self.learn_start != 0:
+            self.learn_start -= 1
+            if self.learn_start % 1000 == 0:
+                print("\tFilling memory: \t{0}".format(self.learn_start, end="\r"))
+            return
         # Update t_step:
         self.t_step += 1
         if self.t_step % self.UPDATE_MODEL_EVERY == 0 and self.t_step % self.UPDATE_TARGET_EVERY == 0:
@@ -91,6 +108,7 @@ class RainbowAgent:
 
         if not self.use_soft_update and self.t_step % self.UPDATE_TARGET_EVERY == 0:
             self.update_target_model()
+            print("\tTarget model updated")
 
     def act(self, state, eps=0):
         """Returns actions for given state as per current policy.
@@ -127,22 +145,24 @@ class RainbowAgent:
         if self.per:
             idxs, experiences, is_weights = self.memory.sample()
             is_weights = torch.from_numpy(is_weights).float().to(self.device)
-            states = torch.from_numpy(np.vstack([e[0] for e in experiences if e is not None])).float().to(self.device)
+            states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
             if self.continues:
-                actions = torch.from_numpy(np.vstack([e[1] for e in experiences if e is not None])).float().to(
+                actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(
                     self.device)
             else:
-                actions = torch.from_numpy(np.vstack([e[1] for e in experiences if e is not None])).long().to(
+                actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(
                     self.device)
-            rewards = torch.from_numpy(np.vstack([e[2] for e in experiences if e is not None])).float().to(self.device)
-            next_states = torch.from_numpy(np.vstack([e[3] for e in experiences if e is not None])).float().to(
+            rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(self.device)
+            next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(
                 self.device)
             dones = torch.from_numpy(
-                np.vstack([e[4] for e in experiences if e is not None]).astype(np.uint8)).float().to(
+                np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(
                 self.device)
         else:
             experiences = self.memory.sample()
             states, actions, rewards, next_states, dones = experiences
+        #todo:: Test if this is ok.
+        # with torch.no_grad():
 
         # Getting the max action of local network (using weights w)
         max_actions = self.model.forward(next_states).detach().max(1)[1].unsqueeze(1)

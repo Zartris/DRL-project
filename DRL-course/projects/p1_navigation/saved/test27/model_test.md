@@ -6,6 +6,9 @@
 	seed: 0
 	state_size: 37
 	action_size: 4
+	
+*model info:*
+	std_init:0.2
 
 *agent info:*
 	Agent: rainbow

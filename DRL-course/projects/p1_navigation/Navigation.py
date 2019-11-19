@@ -12,6 +12,12 @@ from projects.p1_navigation.agents.rainbow_agent import RainbowAgent
 from projects.p1_navigation.models.models import NoisyDDQN, DDQN
 
 
+def create_model_info(name, std_init):
+    m_info = str(name) + "\n"
+    m_info += "\tstd_init:" + str(std_init) + "\n"
+    return m_info
+
+
 def create_train_info(name, episodes, evaluation_interval, max_t, eps_start, eps_end, eps_decay):
     t_info = str(name) + "\n"
     t_info += "\tepisodes:" + str(episodes) + "\n"
@@ -299,6 +305,10 @@ if __name__ == '__main__':
     print('States have length:', state_size)
     general_info = create_general_info("*general info:*", game, seed, state_size, action_size)
 
+    # model parameters:
+    std_init = 0.2
+    model_info = create_model_info("*model info:*", std_init)
+
     # Agent Hyperparameters
     continues = False
     BUFFER_SIZE = (2 ** 20)
@@ -342,11 +352,15 @@ if __name__ == '__main__':
     title = "model: "
     if model == DDQN:
         title += "Dueling, "
+        models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
     elif model == NoisyDDQN:
         title += "NoisyDueling, "
         use_noise = True
+        models = (model(state_size, action_size, seed=seed, std_init=std_init),
+                  model(state_size, action_size, seed=seed, std_init=std_init))
     else:
         title += "Normal, "
+        models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
 
     title += "agent: rainbow, "
     if RB_method == "nstep_per":
@@ -364,7 +378,6 @@ if __name__ == '__main__':
 
     # Test or train
     if test_agent:
-        models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
         agent = RainbowAgent(state_size, action_size, models, use_noise=use_noise, seed=seed,
                              continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                              LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
@@ -389,11 +402,11 @@ if __name__ == '__main__':
         with open(file, "a+") as f:
             f.write("\n# " + str(title) + "\n\n")
             f.write(general_info + "\n")
+            f.write(model_info + "\n")
             f.write(agent_info + "\n")
             f.write(per_info + "\n")
             f.write(train_info + "\n\n")
             f.write("\n## train data: \n\n")
-        models = (model(state_size, action_size, seed=seed), model(state_size, action_size, seed=seed))
         agent = RainbowAgent(state_size, action_size, models, use_noise=use_noise, seed=seed,
                              continues=continues, BUFFER_SIZE=BUFFER_SIZE, BATCH_SIZE=BATCH_SIZE, GAMMA=GAMMA, TAU=TAU,
                              LR=LR, UPDATE_MODEL_EVERY=UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY=UPDATE_TARGET_EVERY,
