@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from rainbow.models.layers import FactorizedNoisyLinear
+from projects.p1_navigation.models.layers import FactorizedNoisyLinear
 
 
 class QNetwork(nn.Module):
