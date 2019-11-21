@@ -12,17 +12,17 @@
 
 *agent info:*
 	Agent: rainbow
-	GAMMA: 0.99
+	GAMMA: 0.95
 	TAU: 0.001
-	LR: 5e-05
+	LR: 0.0001
 	opt_eps: 0.00015
 	UPDATE_MODEL_EVERY: 10
 	UPDATE_TARGET_EVERY: 8000
 	use_soft_update: True
 	priority_method: reward
 	atom_size: 51
-	v_max: 200
-	v_min: 0
+	v_max: 1
+	v_min: -1
 
 *per_info:*
 	RB_method:nstep_per
@@ -32,9 +32,9 @@
 	PER_a: 0.6
 	PER_b: 0.4
 	PER_bi: 1e-05
-	PER_aeu: 3
+	PER_aeu: 1
 	PER_learn_start 0
-	n_step 8
+	n_step 20
 
 *train_info:*
 	episodes:500
@@ -45,3 +45,6 @@
 
 ## train data: 
 
+	Episode 100	Average Score: 0.82
+	Episode 200	Average Score: 3.58
+	Episode 300	Average Score: 11.43

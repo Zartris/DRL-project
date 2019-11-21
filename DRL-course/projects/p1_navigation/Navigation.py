@@ -48,16 +48,16 @@ if __name__ == '__main__':
     PER_a = 0.6  # Alpha
     PER_b = 0.4  # Beta init
     PER_bi = 0.00001  # Beta increase is the increase in taking the most prioritiesed replays
-    PER_aeu = 100  # Absolute error upper is the max priority a replay can have
+    PER_aeu = 2  # Absolute error upper is the max priority a replay can have
     PER_learn_start = 0  # Used to populated the sumtree with replays
-    n_step = 8  # Used in the n-step implementation for choosing how many sequent replays we use.
+    n_step = 20  # Used in the n-step implementation for choosing how many sequent replays we use.
     per_info = log.create_per_info("*per_info:*", BUFFER_SIZE, BATCH_SIZE,
                                    RB_method, PER_e, PER_a, PER_b, PER_bi, PER_aeu, PER_learn_start, n_step)
 
     # Double DQN agent
-    GAMMA = 0.99  # Future discount value
+    GAMMA = 0.95  # Future discount value
     TAU = 1e-3  # Amount we update the target model each update session (use_soft_update=True)
-    LR = 0.00005  # The learning rate of the model
+    LR = 0.0001  # The learning rate of the model
     opt_eps = 1.5e-4  # Adam epsilon (more info)
     UPDATE_MODEL_EVERY = 10  # The amount of steps between model updates
     UPDATE_TARGET_EVERY = 8000  # The amount of steps between target updates (use_soft_update=Flase)
@@ -66,8 +66,8 @@ if __name__ == '__main__':
 
     # Distributed
     atom_size = 51  # Number of atoms
-    v_max = 200  # Max value for supprt
-    v_min = 0  # Min value for support
+    v_max = 1 # Max value for supprt
+    v_min = -v_max  # Min value for support
 
     agent_info = log.create_agent_info("*agent info:*", GAMMA, TAU, LR, opt_eps,
                                        UPDATE_MODEL_EVERY, UPDATE_TARGET_EVERY, use_soft_update, priority_method,

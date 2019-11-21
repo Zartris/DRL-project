@@ -4,9 +4,11 @@ from collections import deque
 import numpy as np
 import torch
 
+from projects.p1_navigation.utils import helper
+
 
 def evaluate(agent, brain_name, test_env, n_episodes, train_episode="Loaded model", model_save_file=None,
-         current_best=10000, set_fast_mode=True):
+             current_best=10000, set_fast_mode=True):
     scores = []  # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     time_window = deque(maxlen=10)  # last 10 iter
@@ -18,7 +20,7 @@ def evaluate(agent, brain_name, test_env, n_episodes, train_episode="Loaded mode
         max_reached = False
         while not max_reached:
             action = int(agent.act(state))
-            next_state, reward, done, max_reached = unpack_braininfo(brain_name, test_env.step(action))
+            next_state, reward, done, max_reached = helper.unpack_braininfo(brain_name, test_env.step(action))
             state = next_state
             score += reward
             if done:

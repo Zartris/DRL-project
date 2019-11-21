@@ -21,8 +21,8 @@
 	use_soft_update: True
 	priority_method: reward
 	atom_size: 51
-	v_max: 200
-	v_min: 0
+	v_max: 1
+	v_min: -1
 
 *per_info:*
 	RB_method:nstep_per
@@ -32,7 +32,7 @@
 	PER_a: 0.6
 	PER_b: 0.4
 	PER_bi: 1e-05
-	PER_aeu: 3
+	PER_aeu: 100
 	PER_learn_start 0
 	n_step 8
 
@@ -45,3 +45,4 @@
 
 ## train data: 
 
+	Episode 100	Average Score: 1.11
