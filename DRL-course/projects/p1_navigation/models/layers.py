@@ -9,14 +9,20 @@ import torch.nn.functional as F
 class FactorizedNoisyLinear(nn.Module):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, in_features, out_features, seed, is_training=True, std_init=0.5, name="noisyLinear"):
+    def __init__(self,
+                 in_features,  # Number of input features
+                 out_features,  # Number of output features
+                 std_init,  # Amount of noise in layer
+                 seed=None,  # The env seed (if needed)
+                 name="noisyLinear"  # Name for debugging
+                 ):
         super(FactorizedNoisyLinear, self).__init__()
-        self.seed = seed
-        torch.manual_seed(self.seed)
+        if seed is not None:
+            self.seed = seed
+            torch.manual_seed(self.seed)
 
         self.in_features = in_features
         self.out_features = out_features
-        self.is_training = is_training
 
         self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features))
         self.weight_sigma = nn.Parameter(torch.Tensor(out_features, in_features))
@@ -32,7 +38,12 @@ class FactorizedNoisyLinear(nn.Module):
         self.reset_parameters()
         self.reset_noise()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
+        """
+        Applying noise to the weights and bias to simulate exploring
+        :param x: The input state
+        :return: Linear translation with noisy weights and bias.
+        """
         if self.training:
             weight = self.weight_mu + self.weight_sigma * self.weight_epsilon
             bias = self.bias_mu + self.bias_sigma * self.bias_epsilon

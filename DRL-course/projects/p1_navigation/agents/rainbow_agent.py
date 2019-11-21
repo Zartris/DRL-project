@@ -1,4 +1,7 @@
+import time
+
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 from torch import optim
@@ -15,10 +18,8 @@ class RainbowAgent:
                  state_size: int,
                  action_size: int,
                  models: list,
-                 use_noise: bool,
-                 seed: int,
-                 continues: bool = False,
-                 BUFFER_SIZE: int = (2 ** 20),
+                 replay_buffer: PerNStep,
+                 seed: int = None,
                  BATCH_SIZE: int = 64,
                  GAMMA: float = 0.99,
                  TAU: float = 1e-3,
@@ -27,23 +28,24 @@ class RainbowAgent:
                  UPDATE_TARGET_EVERY: int = 1000,
                  use_soft_update: bool = False,
                  priority_method: str = "reward",
-                 RB_method: str = "nstep_per",
-                 PER_e: float = 0.01,
-                 PER_a: float = .6,
-                 PER_b: float = .4,
-                 PER_bi: float = 0.001,
-                 PER_aeu: int = 3,
-                 PER_learn_start: int = 20000,
+                 # PER
+                 PER_learn_start: int = 0,
+                 PER_eps: float = 1e-6,
+                 # N-step
                  n_step: int = 3,
-                 atom_size: int = 51):
+                 # Distributed
+                 atom_size: int = 0,
+                 support=None,
+                 v_max: int = 200,
+                 v_min: int = 0):
         # seed for comparison
         self.seed = seed
-        np.random.seed(self.seed)
-        torch.manual_seed(self.seed)
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
         # Hyper parameters:
-        self.state_size = state_size
-        self.action_size = action_size
-        self.buffer_size = BUFFER_SIZE
+        self.state_size = state_size  # Not used only for debugging
+        self.action_size = action_size  # Not used only for debugging
         self.batch_size = BATCH_SIZE
         self.gamma = GAMMA
         self.tau = TAU
@@ -53,44 +55,28 @@ class RainbowAgent:
         self.use_soft_update = use_soft_update
         self.priority_method = priority_method
         self.t_step = 0
-        self.learn_start = PER_learn_start
 
+        # PER:
+        self.learn_start = PER_learn_start
+        self.PER_eps = PER_eps
         # Double DQN or QN:
-        self.use_noise = use_noise
         self.model = models[0].to(self.device)
         self.model_target = models[1].to(self.device)
-        self.continues = continues
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, eps=1.5e-4)
 
         # N-step:
         self.n_step = n_step
 
         # Priority Experience Replay:
-        self.RB_method = RB_method
-        if self.RB_method == "nstep_per":
-            self.memory = PerNStep(capacity=self.buffer_size, batch_size=self.batch_size, seed=self.seed,
-                                   state_size=self.state_size, epsilon=PER_e, alpha=PER_a, beta=PER_b,
-                                   beta_increase=PER_bi, absolute_error_upper=PER_aeu,
-                                   n_step=self.n_step, gamma=self.gamma)
-            self.per = True
-        elif self.RB_method == "per":
-            self.memory = PrioritizedReplayBuffer(capacity=self.buffer_size, batch_size=self.batch_size,
-                                                  seed=self.seed, epsilon=PER_e, alpha=PER_a, beta=PER_b,
-                                                  beta_increase=PER_bi, absolute_error_upper=PER_aeu)
-            self.per = True
-        else:
-            self.memory = ReplayBuffer(self.action_size, self.buffer_size, self.batch_size, self.seed, self.device)
-            self.per = False
+        self.memory = replay_buffer
 
         # Distributional aspect:
         # The support for the value distribution. Set to 51 for C51
         self.atom_size = atom_size
         # Break the range of rewards into 51 uniformly spaced values (support)
-        self.v_max = 5 * self.n_step  # Rewards are clipped to -20, 20
-        self.v_min = -5 * self.n_step
-        self.support = torch.linspace(
-            self.v_min, self.v_max, self.atom_size
-        ).to(self.device)
+        self.v_max = v_max
+        self.v_min = v_min
+        self.support = support
 
         # plotting:
         self.losses = []
@@ -107,16 +93,14 @@ class RainbowAgent:
             done: If the game terminated after this step.
         """
         # Save experience in replay memory
-        if self.per:
-            if self.priority_method == "None":
-                error = None
-            elif self.priority_method == "error":
-                error = self.compute_error(state, action, reward, next_state, done)
-            else:
-                error = reward
-            self.memory.add(state, action, reward, next_state, done, error)
+        if self.priority_method == "None":
+            error = None
+        elif self.priority_method == "error":
+            error = self.compute_error(state, action, reward, next_state, done)
         else:
-            self.memory.add(state, action, reward, next_state, done)
+            error = reward
+        self.memory.add(state, action, reward, next_state, done, error)
+
         # Filling memory
         if self.learn_start != 0:
             self.learn_start -= 1
@@ -141,13 +125,12 @@ class RainbowAgent:
             self.update_target_model()
             print("\tTarget model updated")
 
-    def act(self, state, eps=0):
+    def act(self, state):
         """Returns actions for given state as per current policy.
 
         Params
         ======
             state (array_like): current state
-            eps (float): epsilon, for epsilon-greedy action selection
         """
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         # TODO: Question for reviewers, should i disable noise here? hence put it on eval mode
@@ -155,10 +138,11 @@ class RainbowAgent:
         #       but this might be from less exploring, hence might be bad in the longer run.
         #       The noise is applied to the sampled memories under model update,
         #       so this is why we might not need it here?
-        # self.model.eval()
-        with torch.no_grad():
-            action_values = self.model.forward(state)
-        # self.model.train()
+        # self.model.eval() # disable noise
+
+        action_values = self.model.forward(state)
+        # self.model.train() # enable noise
+        action = np.argmax(action_values.detach().cpu().numpy())
         return np.argmax(action_values.detach().cpu().numpy())
 
     def learn(self):
@@ -169,60 +153,88 @@ class RainbowAgent:
                     experiences (Tuple[torch.Variable]): tuple of (s, a, r, s', done) tuples
                     gamma (float): discount factor
                 """
-        if self.per:
-            idxs, experiences, is_weights = self.memory.sample()
-            is_weights = torch.from_numpy(is_weights).float().to(self.device)
-            states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(
-                self.device)
-            if self.continues:
-                actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(
-                    self.device)
-            else:
-                actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(
-                    self.device)
-            rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(
-                self.device)
-            next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(
-                self.device)
-            dones = torch.from_numpy(
-                np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(
-                self.device)
-        else:
-            experiences = self.memory.sample()
-            states, actions, rewards, next_states, dones = experiences
-        # todo:: Test if this is ok.
-        # with torch.no_grad():
+        # PER sampling:
+        idxs, experiences, is_weights = self.memory.sample()
 
-        # Getting the max action of local network (using weights w)
-        max_actions = self.model.forward(next_states).detach().max(1)[1].unsqueeze(1)
+        # Compute the error or loss:
+        errors = self._compute_loss(experiences)
 
-        # Getting the Q-value for these actions (using weight w^-)
-        Q_targets_next = self.model_target.forward(next_states).detach().gather(1, max_actions)
+        # Prepare weights:
+        is_weights = torch.from_numpy(is_weights).float().to(self.device)
 
-        # Compute Q targets for current states (TD-target)
-        Q_targets = rewards + (self.gamma * Q_targets_next * (1 - dones))
+        # Compute loss - Per: weighted loss computed and the priorities are updated
+        loss = torch.mean(is_weights * errors)
 
-        # Get expected Q values from local model
-        Q_expected = self.model(states).gather(1, actions)
-
-        if self.per:
-            errors = torch.abs(Q_expected - Q_targets).detach().cpu()
-            self.memory.update_memory_tree(idxs, errors)
-            loss = (is_weights * F.mse_loss(Q_expected, Q_targets)).mean()
-        else:
-            loss = F.mse_loss(Q_expected, Q_targets)
-
-        # Compute loss
         # Minimize the loss
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        # todo::Consider resetting noise here
+
+        # Update priorities:
+        self.memory.update_memory_tree(idxs, errors.detach().cpu())
+
+        # Resetting the noise of the model
         self.model.reset_noise()
         self.model_target.reset_noise()
-        return loss.item()
+        return loss.item()  # Return loss for logging
+
+    def _compute_loss(self, experiences):
+        """ Computing the loss from the categorical result
+        """
+        # TODO::Check if gamma should be gamme = gamma ** n_steps
+        states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
+        actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(self.device)
+        rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(self.device)
+        next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(
+            self.device)
+        dones = torch.from_numpy(
+            np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(
+            self.device)
+
+        # Categorical DQN algorithm
+        delta_z = float(self.v_max - self.v_min) / (self.atom_size - 1)
+
+        # TODO: Check if no_grad() here:
+        with torch.no_grad():
+            # Double DQN
+            next_actions = self.model(next_states).argmax(1)
+            actions = actions.reshape(-1) # Flatten
+            next_q_dist = self.model_target.get_distribution(next_states)
+            next_q_dist = next_q_dist[range(self.batch_size), next_actions]
+
+            t_z = rewards + (1 - dones) * self.gamma * self.support
+            t_z = t_z.clamp(min=self.v_min, max=self.v_max)
+            b = (t_z - self.v_min) / delta_z
+            l = b.floor().long()
+            u = b.ceil().long()
+
+            offset = (
+                torch.linspace(
+                    0, (self.batch_size - 1) * self.atom_size, self.batch_size
+                ).long()
+                    .unsqueeze(1)
+                    .expand(self.batch_size, self.atom_size)
+                    .to(self.device)
+            )
+
+            proj_dist = torch.zeros(next_q_dist.size(), device=self.device)
+            proj_dist.view(-1).index_add_(
+                0, (l + offset).view(-1), (next_q_dist * (u.float() - b)).view(-1)
+            )
+            proj_dist.view(-1).index_add_(
+                0, (u + offset).view(-1), (next_q_dist * (b - l.float())).view(-1)
+            )
+
+        q_dist = self.model.get_distribution(states)
+        log_p = torch.log(q_dist[range(self.batch_size), actions])  # Since we use softmax
+        elementwise_loss = -(proj_dist * log_p).sum(1)
+
+        return elementwise_loss
 
     def compute_error(self, state, action, reward, next_state, done):
+        """ Compute the error between model and model_target given one experience
+        """
+        # Set to eval to avoid backpropergation:
         self.model.eval()
         self.model_target.eval()
         with torch.no_grad():
@@ -264,3 +276,114 @@ class RainbowAgent:
         """
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+
+    def train(agent, brain_name, train_env, file, save_img="plot.png", save_file='checkpoint.pth',
+              n_episodes=2000000, evaluation_interval=200, plot=False, plot_title="title"):
+        """Deep Q-Learning.
+
+        Params
+        ======
+            n_episodes (int): maximum number of training episodes
+            max_t (int): maximum number of timesteps per episode
+            eps_start (float): starting value of epsilon, for epsilon-greedy action selection
+            eps_end (float): minimum value of epsilon
+            eps_decay (float): multiplicative factor (per episode) for decreasing epsilon
+        """
+        if plot:
+            buffer = 1
+            min_score = 0
+            max_score = min_score + buffer
+            fig = plt.figure()
+            # fig, axs = plt.subplots(2, 1)
+            # score_ax = axs[0]
+            score_ax = fig.add_subplot(111)
+            score_line_blue, = score_ax.plot([0, 0])
+            score_line_olive, = score_ax.plot([0, 0], color='olive')
+            score_ax.set_ylim([min_score, max_score])
+            score_ax.set_xlim([0, 1])
+
+            # loss_ax = axs[1]
+            # loss_line_blue, = loss_ax.plot([0, 0])
+            # loss_ax.set_ylim([0, 10])
+            # loss_ax.set_xlim([0, 1])
+
+            plt.title(plot_title)
+            plt.xlabel('epoch')
+            plt.ylabel('score mean over 5 epoch')
+            plt.ion()
+            plt.show()
+        scores = []  # list containing scores from each episode
+        scores_window = deque(maxlen=100)  # last 100 scores
+        time_window = deque(maxlen=10)  # last 10 iter
+        best_avg = 13.0
+        eval_result = "\n## test result: \n\n"
+        for i_episode in range(1, n_episodes + 1):
+            state = train_env.reset(train_mode=True)[brain_name].vector_observations[0]
+            score = 0
+            start = time.time()
+            max_reached = False
+            while not max_reached:
+                action = int(agent.act(state))
+                next_state, reward, done, max_reached = utils.unpack_braininfo(brain_name, train_env.step(action))
+                agent.step(state, action, reward, next_state, done)
+                state = next_state
+                score += reward
+                if done:
+                    break
+            time_window.append(time.time() - start)
+
+            scores_window.append(score)  # save most recent score
+            scores.append(score)  # save most recent score
+            print(
+                '\rEpisode {}\tAverage Score: {:.2f}\tthis Score: {:.2f}\tAverage Time pr episode {:.2f} seconds'.format(
+                    i_episode,
+                    np.mean(
+                        scores_window),
+                    score,
+                    np.mean(
+                        time_window)),
+                end="")
+            if plot and i_episode % 5 == 0:
+                # score
+                # Update axis:
+                window = scores[-5:]
+                mean = np.mean(window)
+                if mean > max_score - buffer:
+                    max_score = mean + buffer
+                    score_ax.set_ylim([min_score, max_score])
+                if mean < min_score + buffer:
+                    min_score = mean - buffer
+                    score_ax.set_ylim([min_score, max_score])
+                score_ax.set_xlim([0, len(scores)])
+                # PLOT
+                fig = utils.plot_score(scores, score_line_blue, score_line_olive, fig)
+
+            if i_episode % 100 == 0:
+                print('\rEpisode {}\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(i_episode,
+                                                                                             np.mean(scores_window),
+                                                                                             np.mean(time_window) * (
+                                                                                                     n_episodes - i_episode)))
+                with open(file, "a+") as f:
+                    f.write('\tEpisode {}\tAverage Score: {:.2f}\n'.format(i_episode, np.mean(scores_window)))
+                if plot:
+                    plt.savefig(save_img)
+
+            if np.mean(scores_window) >= best_avg:
+                #             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}\tTime left {:.2f} seconds'.format(
+                #                 i_episode,
+                #                 np.mean(scores_window), np.mean(time_window) * (n_episodes - i_episode)))
+                # log_result, current_best = eval(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
+                # eval_result += log_result
+                # best_avg = current_best
+                debug = 0
+
+            if i_episode % evaluation_interval == 0:
+                # Time for evaluation
+                log_result, current_best = evaluate(agent, brain_name, train_env, 100, i_episode, save_file, best_avg)
+                eval_result += log_result
+                best_avg = current_best
+
+        with open(file, "a+") as f:
+            f.write(eval_result)
+            f.write("\n\nbest score: " + str(max(scores)) + " at eps: " + str(scores.index(max(scores))))
+        return scores, best_avg
