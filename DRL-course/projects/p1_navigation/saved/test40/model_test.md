@@ -39,7 +39,7 @@
 *train_info:*
 	episodes:500
 	evaluation_interval:200
-	max_t: 1000
+	max_t: 1000 (not used)
 
 
 
@@ -49,3 +49,4 @@
 	Episode 200	Average Score: 10.70
 	Episode 300	Average Score: 12.11
 	Episode 400	Average Score: 12.85
+
