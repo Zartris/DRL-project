@@ -56,6 +56,14 @@ class FactorizedNoisyLinear(nn.Module):
         return y
 
     def reset_parameters(self):
+        """
+        Quote from paper:
+        # For factorised noisy networks, each element µi,j was initialised by a sample from an independent
+        # uniform distributions U[− (1/ sqrt(p)), + (1/sqrt(p))]
+        # and each element σi,j was initialised to a constant sqrt(σ_0/p).
+        # The hyperparameter σ_0 is set to 0.5 (Not in our case).
+        :return:
+        """
         std = 1 / math.sqrt(self.in_features)
         self.weight_mu.data.uniform_(-std, std)
         self.weight_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
@@ -66,7 +74,7 @@ class FactorizedNoisyLinear(nn.Module):
     def reset_noise(self):
         epsilon_in = self._scale_noise(self.in_features)
         epsilon_out = self._scale_noise(self.out_features)
-        self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
+        self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in)) # Ger is outer product
         self.bias_epsilon.copy_(epsilon_out)
 
     def _scale_noise(self, size):

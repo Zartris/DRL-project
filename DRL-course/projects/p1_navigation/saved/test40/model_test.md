@@ -14,7 +14,7 @@
 	Agent: rainbow
 	GAMMA: 0.95
 	TAU: 0.001
-	LR: 5e-05
+	LR: 0.00005
 	opt_eps: 0.00015
 	UPDATE_MODEL_EVERY: 10
 	UPDATE_TARGET_EVERY: 8000

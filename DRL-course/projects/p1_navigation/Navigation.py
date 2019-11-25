@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     # Game values
     game = "Banana.exe"
-    env = UnityEnvironment(file_name=game, seed=test_seed if use_test_seed else seed, no_graphics=False)
+    env = UnityEnvironment(file_name=game, seed=seed, no_graphics=False)
     # get the default brain
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     general_info = log.create_general_info("*general info:*", game, seed, state_size, action_size)
 
     # Model parameters:
-    std_init = 0.2
+    std_init = 0.2  # noted σ zero in the paper and they use default as 0.5
     model_info = log.create_model_info("*model info:*", std_init)
 
     # PER:
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     PER_a = 0.6  # Alpha
     PER_b = 0.4  # Beta init
     PER_bi = 0.00001  # Beta increase is the increase in taking the most prioritiesed replays
-    PER_aeu = 2  # Absolute error upper is the max priority a replay can have
+    PER_aeu = 1  # Absolute error upper is the max priority a replay can have
     PER_learn_start = 0  # Used to populated the sumtree with replays
     n_step = 20  # Used in the n-step implementation for choosing how many sequent replays we use.
     per_info = log.create_per_info("*per_info:*", BUFFER_SIZE, BATCH_SIZE,
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # Double DQN agent
     GAMMA = 0.95  # Future discount value
     TAU = 1e-3  # Amount we update the target model each update session (use_soft_update=True)
-    LR = 0.0001  # The learning rate of the model
+    LR = 0.00005  # The learning rate of the model
     opt_eps = 1.5e-4  # Adam epsilon (more info)
     UPDATE_MODEL_EVERY = 10  # The amount of steps between model updates
     UPDATE_TARGET_EVERY = 8000  # The amount of steps between target updates (use_soft_update=Flase)
@@ -74,8 +74,8 @@ if __name__ == '__main__':
                                        atom_size, v_max, v_min)
 
     # Training parameters:
-    episodes = 500  # Number of training episodes
-    evaluation_interval = 200  # Indicating how often we evaluate the current agent.
+    episodes = 1000  # Number of training episodes
+    evaluation_interval = 100  # Indicating how often we evaluate the current agent.
     max_t = 1000  # The max number of steps before going into new episode (not used)
     train_info = log.create_train_info("*train_info:*", episodes, evaluation_interval, max_t)
     # Create plot
@@ -113,10 +113,10 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     support = torch.linspace(v_min, v_max, atom_size).to(device)
     # Create models
-    models = (DistributedNoisyDDQN(state_size, action_size, std_init=std_init, support=support,
+    models = [DistributedNoisyDDQN(state_size, action_size, std_init=std_init, support=support,
                                    atom_size=atom_size, seed=seed),
               DistributedNoisyDDQN(state_size, action_size, std_init=std_init, support=support,
-                                   atom_size=atom_size, seed=seed))
+                                   atom_size=atom_size, seed=seed)]
     # Create N-step PER buffer
     replay_buffer = PerNStep(BUFFER_SIZE,
                              BATCH_SIZE,
