@@ -3,6 +3,7 @@ from collections import namedtuple, deque
 import numpy as np
 import torch
 
+
 class PerNStep:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -159,6 +160,7 @@ class PerNStep:
             n_state, done = (n_s, d) if d else (n_state, done)
         return self.experience(timestep, org_state, org_action, rew, n_state, done), rew
 
+
 # https://github.com/Kaixhin/Rainbow/blob/master/memory.py
 class SumTree:
     def __init__(self, capacity, seed=None):
@@ -231,11 +233,3 @@ class SumTree:
     @property
     def total_priority(self):
         return self.tree[0]  # the root
-
-    @property
-    def max_priority(self):
-        return np.max(self.tree[-self.data_length:])
-
-    @property
-    def min_priority(self):
-        return np.min(self.tree[-self.data_length:])

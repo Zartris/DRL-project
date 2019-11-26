@@ -2,7 +2,7 @@
 # model: NoisyDueling, agent: rainbow, NSTEP_PER-rewardUpdate: soft
 
 *general info:*
-	game:Banana.exe
+	game: Banana.exe
 	seed: 0
 	state_size: 37
 	action_size: 4

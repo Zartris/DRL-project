@@ -19,7 +19,7 @@ class FactorizedNoisyLinear(nn.Module):
         super(FactorizedNoisyLinear, self).__init__()
         if seed is not None:
             self.seed = seed
-            torch.manual_seed(self.seed)
+            torch.manual_seed(seed)
 
         self.in_features = in_features
         self.out_features = out_features
@@ -72,11 +72,25 @@ class FactorizedNoisyLinear(nn.Module):
         self.bias_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
 
     def reset_noise(self):
+        """
+        Factorised Gaussian noise
+        From the paper:
+        # Each ε^{w}_{i,j} and ε^{b}_{j} can then be written as:
+        ε^{w}_{i,j} = f(ε_i) dot f(ε_j)
+        ε^{b}_{j} = f(ε_j)
+        where f is a real value function.
+        """
         epsilon_in = self._scale_noise(self.in_features)
         epsilon_out = self._scale_noise(self.out_features)
+        # ε^{w}_{i,j} = f(ε_i) dot f(ε_j)
         self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in)) # Ger is outer product
+        # ε^{b}_{j} = f(ε_j)
         self.bias_epsilon.copy_(epsilon_out)
 
     def _scale_noise(self, size):
+        """
+        This is the chosen real value function f:
+        sig(x) * sqrt(|x|) as in the paper.
+        """
         x = torch.randn(size)
         return x.sign().mul_(x.abs().sqrt_())

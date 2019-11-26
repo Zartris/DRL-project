@@ -1,14 +1,8 @@
-import time
-
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
-import torch.nn.functional as F
 from torch import optim
 
-from projects.p1_navigation.replay_buffers.experience_replay import ReplayBuffer
 from projects.p1_navigation.replay_buffers.per_nstep import PerNStep
-from projects.p1_navigation.replay_buffers.prioritized_experience_replay import PrioritizedReplayBuffer
 
 
 class RainbowAgent:
@@ -189,19 +183,24 @@ class RainbowAgent:
         with torch.no_grad():
             # Double DQN
             next_actions = self.model(next_states).argmax(1)
-            actions = actions.reshape(-1) # Flatten
+            actions = actions.reshape(-1)  # Flatten
             next_q_dist = self.model_target.get_distribution(next_states)
             next_q_dist = next_q_dist[range(self.batch_size), next_actions]
 
+            # Compute the projection of Tˆz onto the support {z}
             t_z = rewards + (1 - dones) * self.gamma * self.support
             t_z = t_z.clamp(min=self.v_min, max=self.v_max)
-            b = (t_z - self.v_min) / delta_z
-            l = b.floor().long()
-            u = b.ceil().long()
 
+            b = (t_z - self.v_min) / delta_z  # b_j ∈ [0, batch_size − 1]
+            lower = b.floor().long()
+            upper = b.ceil().long()
+
+            # Distribute probability of Tˆz
             offset = (
                 torch.linspace(
-                    0, (self.batch_size - 1) * self.atom_size, self.batch_size
+                    start=0,
+                    end=(self.batch_size - 1) * self.atom_size,
+                    steps=self.batch_size
                 ).long()
                     .unsqueeze(1)
                     .expand(self.batch_size, self.atom_size)
@@ -210,17 +209,21 @@ class RainbowAgent:
 
             proj_dist = torch.zeros(next_q_dist.size(), device=self.device)
             proj_dist.view(-1).index_add_(
-                0, (l + offset).view(-1), (next_q_dist * (u.float() - b)).view(-1)
+                dim=0,
+                index=(lower + offset).view(-1),
+                source=(next_q_dist * (upper.float() - b)).view(-1)
             )
             proj_dist.view(-1).index_add_(
-                0, (u + offset).view(-1), (next_q_dist * (b - l.float())).view(-1)
+                dim=0,
+                index=(upper + offset).view(-1),
+                source=(next_q_dist * (b - lower.float())).view(-1)
             )
 
         q_dist = self.model.get_distribution(states)
-        log_p = torch.log(q_dist[range(self.batch_size), actions])  # Since we use softmax
+        log_p = torch.log(q_dist[range(self.batch_size), actions])
         elementwise_loss = -(proj_dist * log_p).sum(1)
 
-        return elementwise_loss
+        return elementwise_loss  # Cross-entropy loss
 
     def compute_error(self, state, action, reward, next_state, done):
         """ Compute the error between model and model_target given one experience

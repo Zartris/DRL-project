@@ -37,7 +37,7 @@ if __name__ == '__main__':
     general_info = log.create_general_info("*general info:*", game, seed, state_size, action_size)
 
     # Model parameters:
-    std_init = 0.2  # noted σ zero in the paper and they use default as 0.5
+    std_init = 0.2  # noted σ zero in the paper and they use de     fault as 0.5
     model_info = log.create_model_info("*model info:*", std_init)
 
     # PER:
@@ -61,12 +61,12 @@ if __name__ == '__main__':
     opt_eps = 1.5e-4  # Adam epsilon (more info)
     UPDATE_MODEL_EVERY = 10  # The amount of steps between model updates
     UPDATE_TARGET_EVERY = 8000  # The amount of steps between target updates (use_soft_update=Flase)
-    use_soft_update = True  # Wether we are updating the model using soft updates or copying model weights over.
+    use_soft_update = True  # Whether we are updating the model using soft updates or copying model weights over.
     priority_method = "reward"  # Initialised priorities (reward, none=max_val, error=compute_error)
 
     # Distributed
-    atom_size = 51  # Number of atoms
-    v_max = 1 # Max value for supprt
+    atom_size = 51  # Number of atoms# Number of atoms
+    v_max = 1 # Max value for support
     v_min = -v_max  # Min value for support
 
     agent_info = log.create_agent_info("*agent info:*", GAMMA, TAU, LR, opt_eps,
