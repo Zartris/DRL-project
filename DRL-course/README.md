@@ -20,13 +20,6 @@ For Books login to https://www.manning.com/dashboard
 
 
 
-## Questions for next session:
-
-1. What is MAXSQN 
-   * guess max soft(soft Q learning) Q-network or maybe S is for Stochastic??? I don't know.
-   * I found somewhere in Japanese a description: maxsqn is based on Q-value estimation algorithm, combining double-Q learning and entropy regularization (SQL, soft Q learning ).
-     * But I cannot find any papers about it
-
 ## Future reading
 
 1. https://github.com/createamind/DRL
@@ -41,7 +34,7 @@ For Books login to https://www.manning.com/dashboard
 
 ## Library for good links and papers
 
-This is more of a space if I think it is relevant to save a link for future use :) 
+Rainbow DQN summary from [KaplanAlex]( https://github.com/KaplanAlex/rl-sonic/blob/master/README.md )
 
-[Nothing yet]
+Rainbow DQN Implementation from [Rainbow is all you need!]( https://github.com/Curt-Park/rainbow-is-all-you-need )
 

@@ -68,3 +68,4 @@
 	train_episode: 1000	 Average Score over 100 episodes: 13.22
 
 best score: 21.0 at eps: 276
+
