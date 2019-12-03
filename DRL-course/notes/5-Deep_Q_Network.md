@@ -201,7 +201,7 @@ So far, you've learned about three extensions to the Deep Q-Networks (DQN) algor
 But these aren't the only extensions to the DQN algorithm!  Many more extensions have been proposed, including:
 
 - Learning from [multi-step bootstrap targets](https://arxiv.org/abs/1602.01783) (as in A3C - *you'll learn about this in the next part of the nanodegree*)
-- [Distributional DQN](https://arxiv.org/abs/1707.06887)
+- [Distributional DQN](https://arxiv.org/abs/1707.06887)  -  https://towardsdatascience.com/learning-distributions-over-rewards-leads-to-state-of-the-art-in-rl-5afbf70672e 
 - [Noisy DQN](https://arxiv.org/abs/1706.10295) 
 
 Each of the six extensions address a **different** issue with the original DQN algorithm.
