@@ -30,7 +30,11 @@ For Books login to https://www.manning.com/dashboard
 
    - An inside in different methods
 
-     
+3. https://deepmind.com/blog/article/alphastar-mastering-real-time-strategy-game-starcraft-ii
+
+   * It's hard to say Deep reinforcement learning without saying deepminds.
+
+   
 
 ## Library for good links and papers
 

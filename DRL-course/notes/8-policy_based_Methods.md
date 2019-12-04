@@ -366,7 +366,7 @@ In general Policy based methods is very similar to supervied learning here is wh
 
 #### 4.1 Supervised vs reinforcement learning
 
-
+Here is for future reading: http://karpathy.github.io/2016/05/31/rl/
 
 
 
@@ -397,16 +397,42 @@ ____
 ##### Problem Setup:
 
 - A **trajectory** $\tau$ is a state-action sequence $s_0, a_0, \ldots, s_H, a_H, s_{H+1}$.
-- In this lesson, we will use the notation $R(\tau)$ to refer to the return corresponding to trajectory $\tau$.
+- In this lesson, we will use the notation $R(\tau)$ to refer to the return (rewards) corresponding to trajectory $\tau$.
 - Our goal is to find the weights $\theta$ of the policy network to maximize the **expected return** $U(\theta) := \sum_\tau \mathbb{P}(\tau;\theta)R(\tau)$.  
 
+![](images\understand_expected_return.png)
+
 ##### REINFORCE
+
+we learned that our goal is to find the values of the weights $\theta$ in the neural network that maximize the expected return $U$
+
+$U(\theta) = \sum_\tau P(\tau;\theta)R(\tau)$
+
+where $\tau$ is an arbitrary trajectory. One way to determine the value of $\theta$ that maximizes this function is through **gradient ascent**. This algorithm is closely related to **gradient descent**, where the differences are that:
+
+- gradient descent is designed to find the **minimum** of a function, whereas gradient ascent will find the **maximum**, and
+- gradient descent steps in the direction of the **negative gradient**, whereas gradient ascent steps in the direction of the **gradient**.
+
+Our update step for gradient ascent appears as follows:
+
+$\theta \leftarrow \theta + \alpha \nabla_\theta U(\theta)$
+
+where $\alpha$ is the step size that is generally allowed to decay over time. Once we know how to calculate or estimate this gradient, we can repeatedly apply this update step, in the hopes that $\theta$ converges to the value that maximizes $U(\theta)$.
 
 - The pseudocode for REINFORCE is as follows:
   1. Use the policy $\pi_\theta$ to collect $m$ trajectories $\{ \tau^{(1)}, \tau^{(2)}, \ldots, \tau^{(m)}\}$ with horizon $H$.  We refer to the $i$-th trajectory as $\tau^{(i)} = (s_0^{(i)}, a_0^{(i)}, \ldots, s_H^{(i)}, a_H^{(i)}, s_{H+1}^{(i)})$.
   2. Use the trajectories to estimate the gradient $\nabla_\theta U(\theta)$: $\nabla_\theta U(\theta) \approx \hat{g} := \frac{1}{m}\sum_{i=1}^m \sum_{t=0}^{H}  \nabla_\theta \log \pi_\theta(a_t^{(i)}|s_t^{(i)}) R(\tau^{(i)})$
   3. Update the weights of the policy: $\theta \leftarrow \theta + \alpha \hat{g}$
   4. Loop over steps 1-3.
+
+Here is the formula for computing the gradient ascent, and it is simple because we have some assumption that have to be met: $\tau$ corresponds to 1 whole episode and we compute the gradient ascent on only one trajectory.
+
+![](images\simple_gradient_ascent.png)
+
+So now that this is explained we can look at the one without assumption:
+![](images\not_so_simple_gradient_ascent.png)
+
+Here we sum over the $m$ trajectories we have collected and compute the gradient ascent for each visited pair of state action pair. Then we take the average of the gradient found.
 
 ##### Derivation:
 
