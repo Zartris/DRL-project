@@ -42,3 +42,16 @@ Rainbow DQN summary from [KaplanAlex]( https://github.com/KaplanAlex/rl-sonic/bl
 
 Rainbow DQN Implementation from [Rainbow is all you need!]( https://github.com/Curt-Park/rainbow-is-all-you-need )
 
+
+
+____
+
+## Questions to tutor
+
+* Why is policy gradient methods better? 
+  * I really like the adaptive noise idea!
+* Silly question, but why is it called a policy now and a agent earlier?
+* Show code: How do we toggle between gradient decent and ascent?
+  * https://classroom.udacity.com/nanodegrees/nd893/parts/286e7d2c-e00c-4146-a5f2-a490e0f23eda/modules/089d6d51-cae8-4d4b-84c6-9bbe58b8b869/lessons/56729989-c3b3-4c26-a37f-0fc3ec1b5eae/concepts/56a08e09-739f-450a-9414-5501cb5ea949
+* 
+
