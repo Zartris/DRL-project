@@ -488,3 +488,59 @@ So using this new gradient, we can perform gradient ascent to update  our policy
 But there is still one important issue we haven’t addressed yet. If  we keep reusing old trajectories and updating our policy, at some point  the new policy might become different enough from the old one, so that  all the approximations we made could become invalid. 
 
 We need to find a way make sure this doesn’t happen.
+
+**The Policy/Reward Cliff**
+
+What is the problem with updating our policy and ignoring the fact  that the approximations are not valid anymore? One problem is it could  lead to a really bad policy that is very hard to recover from. Let's see how:
+
+
+
+[![img](https://video.udacity-data.com/topher/2018/September/5b9a9625_policy-reward-cliff/policy-reward-cliff.png)](https://classroom.udacity.com/nanodegrees/nd893/parts/286e7d2c-e00c-4146-a5f2-a490e0f23eda/modules/089d6d51-cae8-4d4b-84c6-9bbe58b8b869/lessons/e6ae0022-3c68-479a-8111-e264de5e34ab/concepts/4a6fa90a-eeb1-4412-ac1b-35d6ca4f3809#)
+
+
+
+Say we have some policy parameterized by $\pi_{\theta'}$ (shown on the left plot in black), and with an average reward function (shown on the right plot in black). 
+
+The current policy is labelled by the red text, and the goal is to  update the current policy to the optimal one (green star). To update the policy we can compute a surrogate function $L_{\rm sur}$  (dotted-red curve on right plot). So $L_{\rm sur}$ approximates the reward pretty well around the current policy. But far  away from the current policy, it diverges from the actual reward.
+
+If we continually update the policy by performing gradient ascent, we might get something like the red-dots. The big problem is that at some  point we hit a cliff, where the policy changes by a large amount. From  the perspective of the surrogate function, the average reward is really  great. But the actually average reward is really bad! 
+
+What’s worse, the policy is now stuck in a deep and flat bottom, so  that future updates won’t be able to bring the policy back up! we are  now stuck with a really bad policy.
+
+How do we fix this? Wouldn’t it be great if we can somehow stop the  gradient ascent so that our policy doesn’t fall off the cliff?
+
+**Clipped Surrogate Function**
+
+
+
+[![img](https://video.udacity-data.com/topher/2018/September/5b9a99cd_clipped-surrogate/clipped-surrogate.png)](https://classroom.udacity.com/nanodegrees/nd893/parts/286e7d2c-e00c-4146-a5f2-a490e0f23eda/modules/089d6d51-cae8-4d4b-84c6-9bbe58b8b869/lessons/e6ae0022-3c68-479a-8111-e264de5e34ab/concepts/4a6fa90a-eeb1-4412-ac1b-35d6ca4f3809#)
+
+
+
+Here’s an idea: what if we just flatten the surrogate function (blue curve)? What would policy update look like then?
+
+So starting with the current policy (blue dot), we apply gradient  ascent. The updates remain the same, until we hit the flat plateau. Now  because the reward function is flat, the gradient is zero, and the  policy update will stop!
+
+Now, keep in mind that we are only showing a 2D figure with one θ′\theta'θ′ direction. In most cases, there are thousands of parameters in a  policy, and there may be hundreds/thousands of high-dimensional cliffs  in many different directions. We need to apply this clipping  mathematically so that it will automatically take care of all the  cliffs. 
+
+**Clipped Surrogate Function**
+
+Here's the formula that will automatically flatten our surrogate function to avoid all the cliffs:
+$$
+L^{\rm clip}_{\rm sur} (\theta',\theta)= \sum_t \min\left\{ \frac{\pi_{\theta'}(a_t|s_t)}{\pi_{\theta}(a_t|s_t)}R_t^{\rm future} ,  {\rm clip}_\epsilon\!\! \left( \frac{\pi_{\theta'}(a_t|s_t)} {\pi_{\theta}(a_t|s_t)} \right) R_t^{\rm future} \right\}
+$$
+Now let’s dissect the formula by looking at one specific term in the sum, and set the future reward to 1 to make things easier.
+
+
+
+[![img](https://video.udacity-data.com/topher/2018/September/5b9a9d58_clipped-surrogate-explained/clipped-surrogate-explained.png)](https://classroom.udacity.com/nanodegrees/nd893/parts/286e7d2c-e00c-4146-a5f2-a490e0f23eda/modules/089d6d51-cae8-4d4b-84c6-9bbe58b8b869/lessons/e6ae0022-3c68-479a-8111-e264de5e34ab/concepts/4a6fa90a-eeb1-4412-ac1b-35d6ca4f3809#)
+
+
+
+We start with the original surrogate function (red), which involves the ratio $\pi_{\theta'}(a_t|s_t)/\pi_\theta(a_t|s_t)$. The black dot shows the location where the current policy is the same as the old policy $(\theta'=\theta)$
+
+We want to make sure the two policy is similar, or that the ratio is close to $1$. So we choose a small $\epsilon$ (typically 0.1 or 0.2), and apply the ${\rm clip}$ function to force the ratio to be within the interval $[1-\epsilon,1+\epsilon]$ (shown in purple).
+
+Now the ratio is clipped in two places. But we only want to clip the  top part and not the bottom part. To do that, we compare this clipped  ratio to the original one and take the minimum (show in blue). This then ensures the clipped surrogate function is always less than the original surrogate function $L_{\rm sur}^{\rm clip}\le L_{\rm sur}$, so the clipped surrogate function gives a more conservative "reward".
+
+(*the blue and purple lines are shifted slightly for easier viewing*)
