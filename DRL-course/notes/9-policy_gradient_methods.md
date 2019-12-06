@@ -249,6 +249,242 @@ $$
 You might wonder, why is it okay to just change our gradient?  Wouldn't that change our original goal of maximizing the expected  reward?
 
 It turns out that mathematically, ignoring past rewards might change  the gradient for each specific trajectory, but it doesn't change the **averaged** gradient. So even though the gradient is different during training, on  average we are still maximizing the average reward. In fact, the  resultant gradient is less noisy, so training using future reward should speed things up!
+
+#### 3.5 Code so far:
+
+**Agent / policy**
+
+~~~~python
+class Policy(nn.Module):
+
+    def __init__(self):
+        super(Policy, self).__init__()
+        # 80x80x2 to 38x38x4
+        # 2 channel from the stacked frame
+        self.conv1 = nn.Conv2d(2, 4, kernel_size=6, stride=2, bias=False)
+        # 38x38x4 to 9x9x32
+        self.conv2 = nn.Conv2d(4, 16, kernel_size=6, stride=4)
+        self.size=9*9*16
+        
+        # two fully connected layer
+        self.fc1 = nn.Linear(self.size, 256)
+        self.fc2 = nn.Linear(256, 1)
+
+        # Sigmoid to 
+        self.sig = nn.Sigmoid()
+        
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(-1,self.size)
+        x = F.relu(self.fc1(x))
+        return self.sig(self.fc2(x))
+~~~~
+
+**Compute the loss:**
+
+~~~~python
+# return sum of log-prob divided by T
+# same thing as -policy_loss
+def surrogate(policy, old_probs, states, actions, rewards,
+              discount = 0.995, beta=0.01):
+
+    # Compute the discounted reward
+    discount = discount**np.arange(len(rewards))
+    rewards = np.asarray(rewards)*discount[:,np.newaxis]
+    
+    # convert rewards to future rewards
+    rewards_future = rewards[::-1].cumsum(axis=0)[::-1]
+    
+    mean = np.mean(rewards_future, axis=1)
+    std = np.std(rewards_future, axis=1) + 1.0e-10
+
+    rewards_normalized = (rewards_future - mean[:,np.newaxis])/std[:,np.newaxis]
+    
+    # convert everything into pytorch tensors and move to gpu if available
+    actions = torch.tensor(actions, dtype=torch.int8, device=device)
+    old_probs = torch.tensor(old_probs, dtype=torch.float, device=device)
+    rewards = torch.tensor(rewards_normalized, dtype=torch.float, device=device)
+
+    # convert states to policy (or probability)
+    new_probs = states_to_prob(policy, states)
+    new_probs = torch.where(actions == RIGHT, new_probs, 1.0-new_probs)
+
+    ratio = new_probs/old_probs
+
+    # include a regularization term
+    # this steers new_policy towards 0.5
+    # add in 1.e-10 to avoid log(0) which gives nan
+    entropy = -(new_probs*torch.log(old_probs+1.e-10)+ \
+        (1.0-new_probs)*torch.log(1.0-old_probs+1.e-10))
+
+    return torch.mean(ratio*rewards + beta*entropy)
+
+~~~~
+
+**Training Code:**
+
+~~~~python
+from parallelEnv import parallelEnv
+import numpy as np
+# WARNING: running through all 800 episodes will take 30-45 minutes
+
+# training loop max iterations
+episode = 500
+# episode = 800
+
+# widget bar to display progress
+!pip install progressbar
+import progressbar as pb
+widget = ['training loop: ', pb.Percentage(), ' ', 
+          pb.Bar(), ' ', pb.ETA() ]
+timer = pb.ProgressBar(widgets=widget, maxval=episode).start()
+
+# initialize environment
+envs = parallelEnv('PongDeterministic-v4', n=8, seed=1234)
+
+discount_rate = .99
+beta = .01
+tmax = 320
+
+# keep track of progress
+mean_rewards = []
+
+for e in range(episode):
+
+    # collect trajectories Hence play an episode
+    old_probs, states, actions, rewards = \
+        pong_utils.collect_trajectories(envs, policy, tmax=tmax)
+        
+    total_rewards = np.sum(rewards, axis=0)
+
+    # this is the SOLUTION!
+    # use your own surrogate function
+    L = -surrogate(policy, old_probs, states, actions, rewards, beta=beta)
+    
+    # L = -pong_utils.surrogate(policy, old_probs, states, actions, rewards, beta=beta)
+    optimizer.zero_grad()
+    L.backward()
+    optimizer.step()
+    del L
+        
+    # the regulation term also reduces
+    # this reduces exploration in later runs
+    beta*=.995
+    
+    # get the average reward of the parallel environments
+    mean_rewards.append(np.mean(total_rewards))
+    
+    # display some progress every 20 iterations
+    if (e+1)%20 ==0 :
+        print("Episode: {0:d}, score: {1:f}".format(e+1,np.mean(total_rewards)))
+        print(total_rewards)
+        
+    # update progress widget bar
+    timer.update(e+1)
+    
+timer.finish()
+~~~~
+
+
+
+#### 3.6 Importance sampling
+
+**Policy Update in REINFORCE**
+
+Let’s go back to the REINFORCE algorithm. We start with a policy, $\pi_\theta$, then using that policy, we generate a trajectory (or multiple ones to reduce noise) $(s_t, a_t, r_t)$. Afterward, we compute a policy gradient, $g$, and update $\theta' \leftarrow \theta + \alpha g$.
+
+At this point, the trajectories we’ve just generated are simply  thrown away. If we want to update our policy again, we would need to  generate new trajectories once more, using the updated policy.
+
+You might ask, why is all this necessary? It’s because we need to  compute the gradient for the current policy, and to do that the  trajectories need to be representative of the current policy.
+
+But this sounds a little wasteful. What if we could somehow recycle  the old trajectories, by modifying them so that they are representative  of the new policy? So that instead of just throwing them away, we  recycle them!
+
+Then we could just reuse the recycled trajectories to compute  gradients, and to update our policy, again, and again. This would make  updating the policy a lot more efficient.  So, how exactly would that work?
+
+**Importance sampling:**
+
+This is where importance sampling comes in. Let’s look at the trajectories we generated using the policy $ \pi_\theta$. It had a probability $P(\tau;\theta)$, to be sampled.
+
+Now Just by chance, the same trajectory can be sampled under the new policy, with a different probability $P(\tau;\theta')$
+
+Imagine we want to compute the average of some quantity, say $f(\tau)$. We could simply generate trajectories from the new policy, compute  $f(\tau)$ and average them. 
+
+Mathematically, this is equivalent to adding up all the $f(\tau)$, weighted by a probability of sampling each trajectory under the new policy. 
 $$
+\sum_\tau P(\tau;\theta') f(\tau)
+$$
+Now we could modify this equation, by multiplying and dividing by the same number, $P(\tau;\theta)$ and rearrange the terms.
+$$
+\sum_\tau \overbrace{P(\tau;\theta)}^{ \begin{matrix} \scriptsize \textrm{sampling under}\\ \scriptsize \textrm{old policy } \pi_\theta \end{matrix} }  \overbrace{\frac{P(\tau;\theta')}{P(\tau;\theta)}}^{ \begin{matrix} \scriptsize  \textrm{re-weighting}\\ \scriptsize \textrm{factor} \end{matrix} } f(\tau)
+$$
+It doesn’t look we’ve done much. But written in this way, we can  reinterpret the first part as the coefficient for sampling under the old policy, with an extra re-weighting factor, in addition to just  averaging.
+
+Intuitively, this tells us we can use old trajectories for computing  averages for new policy, as long as we add this extra re-weighting  factor, that takes into account how under or over–represented each  trajectory is under the new policy compared to the old one.
+
+The same tricks are used frequently across statistics, where the  re-weighting factor is included to un-bias surveys and voting  predictions. 
+
+**The re-weighting factor:**
+
+Now Let’s a closer look at the re-weighting factor. 
+$$
+\frac{P(\tau;\theta')}{P(\tau;\theta)} =\frac {\pi_{\theta'}(a_1|s_1)\, \pi_{\theta'}(a_2|s_2)\, \pi_{\theta'}(a_3|s_3)\,...} {\pi_\theta(a_1|s_1) \, \pi_\theta(a_2|s_2)\, \pi_\theta(a_2|s_2)\, ...}
+$$
+Because each trajectory contains many steps, the probability contains a chain of products of each policy at different time-step.
+
+This formula is a bit complicated. But there is a bigger problem.  When some of policy gets close to zero, the re-weighting factor can  become close to zero, or worse, close to 1 over 0 which diverges to  infinity.
+
+When this happens, the re-weighting trick becomes unreliable. So, In  practice, we want to make sure the re-weighting factor is not too far  from 1 when we utilize importance sampling
+
+#### 3.7 Proximal Policy Optimization
+
+**Re-weighting the Policy Gradient**
+
+Suppose we are trying to update our current policy, $\pi_{\theta'}$. To do that, we need to estimate a gradient, $g$. But we only have trajectories generated by an older policy $\pi_{\theta}$. How do we compute the gradient then?
+
+Mathematically, we could utilize importance sampling. The answer just what a normal policy gradient would be, times a re-weighting factor $P(\tau;\theta')/P(\tau;\theta)$:
+
 
 $$
+g=\frac{P(\tau; \theta')}{P(\tau; \theta)}\sum_t  \frac{\nabla_{\theta'} \pi_{\theta'}(a_t|s_t)}{\pi_{\theta'}(a_t|s_t)}R_t^{\rm future}
+$$
+
+
+We can rearrange these equations, and the re-weighting factor is just the product of all the policy across each step -- I’ve picked out the  terms at time-step $t$ here. We can cancel some terms, but we're still left with a product of the policies at different times, denoted by ".........".
+
+
+$$
+g=\sum_t \frac{...\, \cancel{\pi_{\theta'}(a_t|s_t)} \,...} {...\,\pi_{\theta}(a_t|s_t)\,...} \, \frac{\nabla_{\theta'} \pi_{\theta'}(a_t|s_t)}{\cancel{\pi_{\theta'}(a_t|s_t)}}R_t^{\rm future}
+$$
+
+
+Can we simplify this expression further? This is where proximal  policy comes in. If the old and current policy is close enough to each  other, all the factors inside the "........." would be pretty close to 1, and then we can ignore them.
+
+Then the equation simplifies:
+
+
+$$
+g=\sum_t \frac{\nabla_{\theta'} \pi_{\theta'}(a_t|s_t)}{\pi_{\theta}(a_t|s_t)}R_t^{\rm future}
+$$
+
+
+It looks very similar to the old policy gradient. In fact, if the  current policy and the old policy is the same, we would have exactly the vanilla policy gradient. But remember, this expression is different  because we are comparing two *different* policies
+
+
+
+**The Surrogate Function**
+
+Now that we have the approximate form of the gradient, we can think  of it as the gradient of a new object, called the surrogate function:
+
+
+$$
+g=\nabla_{\theta'} L_{\rm sur}(\theta', \theta) \\
+L_{\rm sur}(\theta', \theta)= \sum_t \frac{\pi_{\theta'}(a_t|s_t)}{\pi_{\theta}(a_t|s_t)}R_t^{\rm future}
+$$
+
+
+So using this new gradient, we can perform gradient ascent to update  our policy -- which can be thought as directly maximize the surrogate  function. 
+
+But there is still one important issue we haven’t addressed yet. If  we keep reusing old trajectories and updating our policy, at some point  the new policy might become different enough from the old one, so that  all the approximations we made could become invalid. 
+
+We need to find a way make sure this doesn’t happen.
