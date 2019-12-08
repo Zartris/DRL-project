@@ -544,3 +544,181 @@ We want to make sure the two policy is similar, or that the ratio is close to $1
 Now the ratio is clipped in two places. But we only want to clip the  top part and not the bottom part. To do that, we compare this clipped  ratio to the original one and take the minimum (show in blue). This then ensures the clipped surrogate function is always less than the original surrogate function $L_{\rm sur}^{\rm clip}\le L_{\rm sur}$, so the clipped surrogate function gives a more conservative "reward".
 
 (*the blue and purple lines are shifted slightly for easier viewing*)
+
+##### 3.8 PPO Summary
+
+So that’s it! We can finally summarize the PPO algorithm
+
+1. First, collect some trajectories based on some policy $\pi_\theta$, and initialize theta prime $\theta'=\theta$
+2. Next, compute the gradient of the clipped surrogate function using the trajectories
+3. Update $\theta'$ using gradient ascent $\theta'\leftarrow\theta' +\alpha \nabla_{\theta'}L_{\rm sur}^{\rm clip}(\theta', \theta)$
+4. Then we repeat step 2-3 without generating new trajectories. Typically, step 2-3 are only repeated a few times
+5. Set $\theta=\theta'$, go back to step 1, repeat.
+
+*The details of PPO was originally published by the team at OpenAI, and you can read their paper through this [link](https://arxiv.org/abs/1707.06347)*
+
+#### 3.9 PPO Code:
+
+- Try normalizing your future rewards over all the parallel agents, it can speed up training
+- Simpler networks might perform better than more complicated ones! The original input contains 80x80x2=12800 numbers, you might want to ensure that this number steadily decreases at each layer of the neural net.
+- Training performance may be significantly *worse* on local machines. I had worse performance training on my own windows desktop with a 4-core CPU and a GPU. This may be due to the slightly different ways the emulator is rendered. So please run the code on the workspace first before moving locally
+- It may be beneficial to train multiple epochs, say first using a small tmax=200 with 500 episodes, and then train again with tmax = 400 with 500 episodes, and then finally with a even larger tmax.
+- Remember to save your policy after training!
+- for a challenge, try the 'Pong-v4' environment, this includes random frameskips and takes longer to train.
+
+A lot of the code is the same as the reinforce method, but i will highlight the main difference
+
+#### 3.9.1 Surrogate (clipped) code
+
+The main difference is the surrogate function now uses the clipped functionality
+
+~~~~python
+# clipped surrogate function
+# similar as -policy_loss for REINFORCE, but for PPO
+def clipped_surrogate(policy,    # Current policy
+                      old_probs, # old probabilites 
+                      states,    # List of states
+                      actions,   # list of actions
+                      rewards,   # List of rewards
+                      discount=0.995, # Discount value
+                      epsilon=0.1, # How different the two polices can be
+                      beta=0.01): # amount of randomness
+
+    discount = discount**np.arange(len(rewards))
+    rewards = np.asarray(rewards)*discount[:,np.newaxis]
+    
+    # convert rewards to future rewards
+    rewards_future = rewards[::-1].cumsum(axis=0)[::-1]
+    
+    mean = np.mean(rewards_future, axis=1)
+    std = np.std(rewards_future, axis=1) + 1.0e-10
+
+    rewards_normalized = (rewards_future - mean[:,np.newaxis])/std[:,np.newaxis]
+    
+    # convert everything into pytorch tensors and move to gpu if available
+    actions = torch.tensor(actions, dtype=torch.int8, device=device)
+    old_probs = torch.tensor(old_probs, dtype=torch.float, device=device)
+    rewards = torch.tensor(rewards_normalized, dtype=torch.float, device=device)
+
+    # convert states to policy (or probability)
+    new_probs = states_to_prob(policy, states)
+    new_probs = torch.where(actions == RIGHT, new_probs, 1.0-new_probs)
+    
+    # ratio for clipping
+    ratio = new_probs/old_probs
+
+    # clipped function
+    clip = torch.clamp(ratio, 1-epsilon, 1+epsilon)
+    clipped_surrogate = torch.min(ratio*rewards, clip*rewards)
+
+    # include a regularization term
+    # this steers new_policy towards 0.5
+    # add in 1.e-10 to avoid log(0) which gives nan
+    entropy = -(new_probs*torch.log(old_probs+1.e-10)+ \
+        (1.0-new_probs)*torch.log(1.0-old_probs+1.e-10))
+
+    
+    # this returns an average of all the entries of the tensor
+    # effective computing L_sur^clip / T
+    # averaged over time-step and number of trajectories
+    # this is desirable because we have normalized our rewards
+    return torch.mean(clipped_surrogate + beta*entropy)
+~~~~
+
+https://github.com/llSourcell/Unity_ML_Agents/blob/master/docs/best-practices-ppo.md
+
+**Entropy**
+
+This corresponds to how random the decisions of a brain are. This should consistently decrease during training. If it decreases too soon or not at all, `beta` should be adjusted (when using discrete action space).
+
+**Beta (Used only in Discrete Control)**
+
+`beta` corresponds to the strength of the entropy regularization, which makes the policy "more random." This ensures that discrete action space agents properly explore during training. Increasing this will ensure more random actions are taken. This should be adjusted such that the entropy (measurable from TensorBoard) slowly decreases alongside increases in reward. If entropy drops too quickly, increase `beta`. If entropy drops too slowly, decrease `beta`.
+
+Typical Range: `1e-4` - `1e-2`
+
+**Epsilon**
+
+`epsilon` corresponds to the acceptable threshold of divergence between the old and new policies during gradient descent updating. Setting this value small will result in more stable updates, but will also slow the training process.
+
+Typical Range: `0.1` - `0.3`
+
+#### 3.9.2 Training code
+
+Another thing that is different is how we train the model:
+
+~~~~python
+from parallelEnv import parallelEnv
+import numpy as np
+# keep track of how long training takes
+# WARNING: running through all 800 episodes will take 30-45 minutes
+
+# training loop max iterations
+episode = 500
+
+# widget bar to display progress
+!pip install progressbar
+import progressbar as pb
+widget = ['training loop: ', pb.Percentage(), ' ', 
+          pb.Bar(), ' ', pb.ETA() ]
+timer = pb.ProgressBar(widgets=widget, maxval=episode).start()
+
+
+envs = parallelEnv('PongDeterministic-v4', n=8, seed=1234)
+
+# Hyper parameters
+discount_rate = .99 # The normal reward discount rate
+epsilon = 0.1 		# How different two policies are allowed to be
+beta = .01 			# The stregth of the regulazation (entropy) 
+tmax = 320			# Amount of timed (step) used per. episode
+# One of the key points in the PPO algorithm is the SGD_epoch.
+# We use the trajectories to update our policy multiple times
+# SGD_epoch is how many times we do this.
+SGD_epoch = 4		
+
+# keep track of progress
+mean_rewards = []
+
+for e in range(episode):
+
+    # collect trajectories
+    old_probs, states, actions, rewards = \
+        pong_utils.collect_trajectories(envs, policy, tmax=tmax)
+        
+    total_rewards = np.sum(rewards, axis=0)
+
+
+    # gradient ascent step
+    for _ in range(SGD_epoch):
+        
+        # uncomment to utilize your own clipped function!
+        # L = -clipped_surrogate(policy, old_probs, states, actions, rewards, epsilon=epsilon, beta=beta)
+
+        L = -pong_utils.clipped_surrogate(policy, old_probs, states, actions, rewards,
+                                          epsilon=epsilon, beta=beta)
+        optimizer.zero_grad()
+        L.backward()
+        optimizer.step()
+        del L
+    
+    # the clipping parameter reduces as time goes on
+    epsilon*=.999
+    
+    # the regulation term also reduces
+    # this reduces exploration in later runs
+    beta*=.995
+    
+    # get the average reward of the parallel environments
+    mean_rewards.append(np.mean(total_rewards))
+    
+    # display some progress every 20 iterations
+    if (e+1)%20 ==0 :
+        print("Episode: {0:d}, score: {1:f}".format(e+1,np.mean(total_rewards)))
+        print(total_rewards)
+        
+    # update progress widget bar
+    timer.update(e+1)
+    
+timer.finish()
+~~~~
+
