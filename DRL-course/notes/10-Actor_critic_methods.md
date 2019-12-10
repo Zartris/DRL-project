@@ -53,3 +53,5 @@ On top of that, this way of training allows us to use on-policy learning in our 
 
 #### 1.3 Off-policy vs On-policy
 
+https://leimao.github.io/blog/RL-On-Policy-VS-Off-Policy/
+
