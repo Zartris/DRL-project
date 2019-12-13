@@ -34,6 +34,12 @@ For Books login to https://www.manning.com/dashboard
 
    * It's hard to say Deep reinforcement learning without saying deepminds.
 
+4. Twin Delayed Deep Deterministic (TD3) policy gradient
+
+   * Paper:[ Addressing Function Approximation Error in Actor-Critic Methods ](https://arxiv.org/pdf/1802.09477.pdf)
+
+   
+
    
 
 ## Library for good links and papers
@@ -42,16 +48,9 @@ Rainbow DQN summary from [KaplanAlex]( https://github.com/KaplanAlex/rl-sonic/bl
 
 Rainbow DQN Implementation from [Rainbow is all you need!]( https://github.com/Curt-Park/rainbow-is-all-you-need )
 
-
+Policy Gradient algorithms by [Lilian weng](https://lilianweng.github.io/lil-log/2018/04/08/policy-gradient-algorithms.html) (extremely well described)
 
 ____
 
 ## Questions to Mentor
 
-* Why is policy gradient methods better? 
-  * I really like the adaptive noise idea!
-* Silly question, but why is it called a policy now and a agent earlier?
-* In Actor Critic methods, he starts talking about baseline? 
-  * We have not meet this term yet... what is it?
-
-twin delayed DDBG
